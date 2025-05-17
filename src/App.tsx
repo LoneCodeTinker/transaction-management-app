@@ -85,8 +85,7 @@ function App() {
   const getRealIdx = (filteredIdx: number) => {
     if (showDone) return filteredIdx;
     // Find the index in the full transactions array
-    const filtered = transactions.filter(tx => !tx.Done);
-    const tx = filtered[filteredIdx];
+    const tx = filteredTxs[filteredIdx];
     return transactions.findIndex(t => t === tx);
   };
 
@@ -153,8 +152,6 @@ function App() {
       setMessage('Network error');
     }
   };
-
-  const filtered = transactions.filter(tx => !tx.Done);
 
   return (
     <div className="container">
