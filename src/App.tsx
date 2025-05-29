@@ -57,7 +57,7 @@ function App() {
     setSelectedIdx(null);
     setEditActions([]);
     setEditDone(false);
-  }, [activeTab]);
+  }, [activeTab, showDone]); // add showDone to dependencies
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
