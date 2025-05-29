@@ -5,7 +5,10 @@ from pydantic import BaseModel
 from typing import List, Optional
 import openpyxl
 import os
-from datetime import date
+from datetime import date, datetime
+from openpyxl.utils.exceptions import InvalidFileException
+from zipfile import BadZipFile
+import shutil
 
 app = FastAPI()
 
@@ -37,14 +40,36 @@ class Transaction(BaseModel):
 
 
 def get_or_create_workbook():
-    if not os.path.exists(EXCEL_FILE):
+    # Try to load workbook, handle corruption
+    try:
+        if not os.path.exists(EXCEL_FILE):
+            wb = openpyxl.Workbook()
+            for sheet in SHEET_NAMES.values():
+                wb.create_sheet(sheet)
+            if 'Sheet' in wb.sheetnames:
+                del wb['Sheet']
+            wb.save(EXCEL_FILE)
+        wb = openpyxl.load_workbook(EXCEL_FILE)
+    except (BadZipFile, InvalidFileException):
+        # Corrupted file: backup and recreate
+        backup_name = f"transactions_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        shutil.move(EXCEL_FILE, backup_name)
         wb = openpyxl.Workbook()
         for sheet in SHEET_NAMES.values():
             wb.create_sheet(sheet)
         if 'Sheet' in wb.sheetnames:
             del wb['Sheet']
         wb.save(EXCEL_FILE)
-    return openpyxl.load_workbook(EXCEL_FILE)
+        wb = openpyxl.load_workbook(EXCEL_FILE)
+    # Ensure all required sheets exist
+    changed = False
+    for sheet in SHEET_NAMES.values():
+        if sheet not in wb.sheetnames:
+            wb.create_sheet(sheet)
+            changed = True
+    if changed:
+        wb.save(EXCEL_FILE)
+    return wb
 
 
 def save_transaction_to_excel(tx: Transaction):
