@@ -3,6 +3,7 @@ import './App.css';
 
 const TABS = [
   { key: 'sales', label: 'Sales', entity: 'Customer' },
+  { key: 'received', label: 'Received Amount', entity: 'Customer' },
   { key: 'purchases', label: 'Purchases', entity: 'Vendor' },
   { key: 'expenses', label: 'Expenses', entity: 'Vendor' },
 ];

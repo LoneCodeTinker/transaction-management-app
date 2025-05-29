@@ -21,7 +21,7 @@ app.add_middleware(
 )
 
 EXCEL_FILE = "transactions.xlsx"
-SHEET_NAMES = {"sales": "Sales", "purchases": "Purchases", "expenses": "Expenses"}
+SHEET_NAMES = {"sales": "Sales", "received": "Received", "purchases": "Purchases", "expenses": "Expenses"}
 
 class Transaction(BaseModel):
     type: str  # sales, purchases, expenses
