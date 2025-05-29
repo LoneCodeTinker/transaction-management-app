@@ -12,5 +12,6 @@ export default defineConfig({
       '/transaction': 'http://localhost:8000',
       '/transactions': 'http://localhost:8000',
     },
+    allowedHosts: ['mc-nas.ddns.net'],
   },
 });

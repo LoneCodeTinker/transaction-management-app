@@ -1,0 +1,13 @@
+#new I want to create a web app that has tabs for transaction types (sales, Purchases, expense)
+
+the first section of the tab:
+has fields for a name of a vendor or customer depending on the tab, and date of transaction, description, reference number, amount, VAT, total amount with VAT... and a save button adds the transaction to an excel workbook in a sheet according to the transaction type
+
+second section:
+check boxes for list of actions needs to be taken to the transaction for example: scanned the bill, registered in the system, paid?, registered the payment in the system... 
+
+third section:
+has a list of all transactions that can be clicked to view the transaction status..
+if all check boxes are checked the transaction moved to done list which should be all the way down or there's another button to show the done transactions among the list
+
+how can we build this project?

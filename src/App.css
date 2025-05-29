@@ -110,6 +110,22 @@ input:focus, textarea:focus {
   outline: 2px solid #0078d4;
 }
 
+input[type="checkbox"] {
+  accent-color: #0078d4 !important;
+  width: 1.1em !important;
+  height: 1.1em !important;
+  margin-right: 0.5em !important;
+  vertical-align: middle !important;
+  display: inline-block !important;
+  background: #fff !important;
+  border: 1px solid #0078d4 !important;
+}
+
+input[type="checkbox"]:checked {
+  background: #0078d4 !important;
+  border-color: #0078d4 !important;
+}
+
 .form-section label {
   display: block;
   margin-bottom: 0.25rem;
