@@ -75,10 +75,11 @@ interface ReferenceFields {
 }
 
 function App() {
+  const today = new Date().toISOString().slice(0, 10);
   const [activeTab, setActiveTab] = useState('sales');
   const [form, setForm] = useState<Record<string, string>>({
     name: '',
-    date: '',
+    date: today,
   });
   // Sales tab specific state
   const [salesItems, setSalesItems] = useState([
@@ -346,23 +347,24 @@ function App() {
                 </div>
                 <div style={{marginTop:16}}>
                   <label>Items:</label>
-                  <table className="sales-items-table">
+                  <div style={{overflowX:'auto'}}>
+                  <table className="sales-items-table" style={{minWidth:600}}>
                     <thead>
                       <tr>
-                        <th>Item Description</th>
-                        <th>Quantity</th>
-                        <th>Price</th>
-                        <th>Total</th>
-                        <th>VAT 15%</th>
-                        <th></th>
+                        <th style={{minWidth:220, width:220}}>Item Description</th>
+                        <th style={{minWidth:100, width:100}}>Quantity</th>
+                        <th style={{minWidth:100, width:100}}>Price</th>
+                        <th style={{minWidth:100, width:100}}>Total</th>
+                        <th style={{minWidth:100, width:100}}>VAT 15%</th>
+                        <th style={{width:40}}></th>
                       </tr>
                     </thead>
                     <tbody>
                       {salesItems.map((item, idx) => (
                         <tr key={idx}>
-                          <td><input value={item.description} onChange={e => handleSalesItemChange(idx, 'description', e.target.value)} /></td>
-                          <td><input type="number" min="1" value={item.quantity} onChange={e => handleSalesItemChange(idx, 'quantity', e.target.value)} style={{width:60}} /></td>
-                          <td><input type="number" min="0" step="0.01" value={item.price} onChange={e => handleSalesItemChange(idx, 'price', e.target.value)} style={{width:80}} /></td>
+                          <td><input style={{width:'100%'}} value={item.description} onChange={e => handleSalesItemChange(idx, 'description', e.target.value)} /></td>
+                          <td><input type="number" min="1" value={item.quantity} onChange={e => handleSalesItemChange(idx, 'quantity', e.target.value)} style={{width:'100%'}} /></td>
+                          <td><input type="number" min="0" step="0.01" value={item.price} onChange={e => handleSalesItemChange(idx, 'price', e.target.value)} style={{width:'100%'}} /></td>
                           <td>{Number(item.total).toFixed(2)}</td>
                           <td>{Number(item.vat).toFixed(2)}</td>
                           <td>{salesItems.length > 1 && <button type="button" onClick={() => handleRemoveSalesItem(idx)}>-</button>}</td>
@@ -370,6 +372,7 @@ function App() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                   <button type="button" onClick={handleAddSalesItem} style={{marginTop:4}}>+ Add Item</button>
                   <div style={{marginTop:8}}>
                     <label><input type="checkbox" checked={salesVAT} onChange={handleSalesVATChange} /> VAT 15% (uncheck for non-tax customers)</label>
