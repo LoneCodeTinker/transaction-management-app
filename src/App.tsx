@@ -270,8 +270,10 @@ function App() {
         type: 'received',
         name: form.name,
         date: form.date,
+        description: form.notes || '', // send as description
         amount: parseFloat(form.amount),
-        notes: form.notes || '',
+        vat: 0, // required by backend
+        total: parseFloat(form.amount), // required by backend
         method: receivedMethod, // send method to backend
         actions,
         done: false,
