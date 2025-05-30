@@ -126,6 +126,24 @@ input[type="checkbox"]:checked {
   border-color: #0078d4 !important;
 }
 
+/* Fix radio button width and appearance */
+input[type="radio"] {
+  width: auto !important;
+  height: auto !important;
+  margin-right: 0.5em !important;
+  vertical-align: middle !important;
+  accent-color: #0078d4 !important;
+  display: inline-block !important;
+  background: #fff !important;
+  border: 1px solid #0078d4 !important;
+}
+
+/* Optionally, for radio checked state */
+input[type="radio"]:checked {
+  background: #0078d4 !important;
+  border-color: #0078d4 !important;
+}
+
 .form-section label {
   display: block;
   margin-bottom: 0.25rem;

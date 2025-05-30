@@ -17,10 +17,8 @@ const TAB_FIELDS: Record<string, Array<{name: string, label: string, type?: stri
   received: [
     { name: 'name', label: 'Customer Name', required: true },
     { name: 'date', label: 'Date', type: 'date', required: true },
-    { name: 'description', label: 'Description' },
-    { name: 'reference', label: 'Reference #' },
     { name: 'amount', label: 'Amount', type: 'number', required: true },
-    { name: 'total', label: 'Total (Received)', type: 'number', placeholder: 'Auto-calculated if empty' },
+    { name: 'notes', label: 'Notes' },
   ],
   purchases: [
     { name: 'name', label: 'Vendor Name', required: true },
@@ -99,6 +97,8 @@ function App() {
   const [editActions, setEditActions] = useState<string[]>([]);
   const [editDone, setEditDone] = useState(false);
   const [showDone, setShowDone] = useState(false);
+  // Add payment method state for received tab
+  const [receivedMethod, setReceivedMethod] = useState<'cash' | 'bank'>('cash');
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -259,7 +259,86 @@ function App() {
       }
       return;
     }
-
+    if (activeTab === 'received') {
+      if (!form.name || !form.date || !form.amount) {
+        setMessage('Name, date, and amount are required.');
+        return;
+      }
+      const payload = {
+        type: 'received',
+        name: form.name,
+        date: form.date,
+        amount: parseFloat(form.amount),
+        notes: form.notes || '',
+        method: receivedMethod,
+        actions,
+        done: false,
+      };
+      try {
+        const res = await fetch('/transaction', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          setMessage('Payment recorded!');
+          setForm({ name: '', date: today, amount: '', notes: '' });
+          setReceivedMethod('cash');
+          setActions([]);
+        } else {
+          const data = await res.json();
+          setMessage(data.detail || 'Error saving payment');
+        }
+      } catch (err) {
+        setMessage('Network error');
+      }
+      return;
+    }
+    // Purchases/Expenses custom logic
+    if (activeTab === 'purchases' || activeTab === 'expenses') {
+      if (!form.name || !form.date || !form.amount || (activeTab === 'purchases' && !form.vat)) {
+        setMessage('Please fill all required fields.');
+        return;
+      }
+      let total = form.total;
+      if (!total || isNaN(Number(total))) {
+        if (activeTab === 'purchases') {
+          total = (parseFloat(form.amount) + parseFloat(form.vat)).toString();
+        } else {
+          total = form.amount;
+        }
+      }
+      const payload = {
+        type: activeTab,
+        name: form.name,
+        date: form.date,
+        description: form.description,
+        reference: form.reference,
+        amount: parseFloat(form.amount),
+        vat: activeTab === 'purchases' ? parseFloat(form.vat) : 0,
+        total: parseFloat(total),
+        actions,
+        done: false,
+      };
+      try {
+        const res = await fetch('/transaction', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          setMessage('Transaction saved!');
+          setForm({ name: '', date: '', description: '', reference: '', amount: '', vat: '', total: '' });
+          setActions([]);
+        } else {
+          const data = await res.json();
+          setMessage(data.detail || 'Error saving transaction');
+        }
+      } catch (err) {
+        setMessage('Network error');
+      }
+      return;
+    }
     // Calculate total if not provided
     const total = form.total || (parseFloat(form.amount) + parseFloat(form.vat)).toString();
     const payload = {
@@ -390,24 +469,71 @@ function App() {
                   <strong>Total: </strong>{salesTotal.toFixed(2)} &nbsp; <strong>VAT: </strong>{salesVATTotal.toFixed(2)} &nbsp; <strong>Total (with VAT): </strong>{salesTotalWithVAT.toFixed(2)}
                 </div>
               </>
-            ) : (
-              TAB_FIELDS[activeTab].map(field => (
-                <div key={field.name}>
-                  <label>{field.label}:{field.required && <span style={{color:'red'}}> *</span>}</label>
-                  {field.name === 'description' ? (
-                    <textarea name={field.name} value={form[field.name]} onChange={handleFormChange} />
-                  ) : (
-                    <input
-                      name={field.name}
-                      type={field.type || 'text'}
-                      value={form[field.name]}
-                      onChange={handleFormChange}
-                      required={field.required}
-                      placeholder={field.placeholder}
-                    />
-                  )}
+            ) : activeTab === 'received' ? (
+              <>
+                {TAB_FIELDS.received.map(field => (
+                  <div key={field.name}>
+                    <label>{field.label}:{field.required && <span style={{color:'red'}}> *</span>}</label>
+                    {field.name === 'notes' ? (
+                      <textarea name={field.name} value={form[field.name] || ''} onChange={handleFormChange} />
+                    ) : (
+                      <input
+                        name={field.name}
+                        type={field.type || 'text'}
+                        value={form[field.name] || ''}
+                        onChange={handleFormChange}
+                        required={field.required}
+                        placeholder={field.placeholder}
+                        // Remove width:100% for radio/checkbox
+                        style={field.type === 'number' || field.type === 'date' ? undefined : {}}
+                      />
+                    )}
+                  </div>
+                ))}
+                <div style={{marginTop:8}}>
+                  <label>Payment Method:</label>
+                  <div style={{display:'flex',gap:16,marginTop:4}}>
+                    <label style={{display:'flex',alignItems:'center',gap:4}}>
+                      <input type="radio" name="receivedMethod" value="cash" checked={receivedMethod === 'cash'} onChange={() => setReceivedMethod('cash')} /> Cash
+                    </label>
+                    <label style={{display:'flex',alignItems:'center',gap:4}}>
+                      <input type="radio" name="receivedMethod" value="bank" checked={receivedMethod === 'bank'} onChange={() => setReceivedMethod('bank')} /> Bank
+                    </label>
+                  </div>
                 </div>
-              ))
+              </>
+            ) : (
+              TAB_FIELDS[activeTab].map(field => {
+                // Hide VAT for expenses
+                if (activeTab === 'expenses' && field.name === 'vat') return null;
+                // Auto-calc total for purchases/expenses
+                let value = form[field.name] || '';
+                if (field.name === 'total') {
+                  if (activeTab === 'purchases') {
+                    value = (form.amount && form.vat) ? (parseFloat(form.amount) + parseFloat(form.vat)).toString() : '';
+                  } else if (activeTab === 'expenses') {
+                    value = form.amount || '';
+                  }
+                }
+                return (
+                  <div key={field.name}>
+                    <label>{field.label}:{field.required && <span style={{color:'red'}}> *</span>}</label>
+                    {field.name === 'description' ? (
+                      <textarea name={field.name} value={form[field.name] || ''} onChange={handleFormChange} />
+                    ) : (
+                      <input
+                        name={field.name}
+                        type={field.type || 'text'}
+                        value={value}
+                        onChange={handleFormChange}
+                        required={field.required && (field.name !== 'total')}
+                        placeholder={field.placeholder}
+                        disabled={field.name === 'total'}
+                      />
+                    )}
+                  </div>
+                );
+              })
             )}
             <button type="submit">Save</button>
           </form>
@@ -428,10 +554,10 @@ function App() {
                 <tr>
                   <th>Name</th>
                   <th>Date</th>
-                  <th>Description</th>
-                  <th>Reference</th>
+                  {activeTab !== 'received' && <th>Description</th>}
+                  {activeTab !== 'received' && <th>Reference</th>}
                   <th>Amount</th>
-                  <th>VAT</th>
+                  {activeTab === 'purchases' && <th>VAT</th>}
                   <th>Total</th>
                   <th>Actions</th>
                   <th>Done</th>
@@ -442,10 +568,10 @@ function App() {
                   <tr key={tx.ID || tx.Reference || idx} className={selectedIdx === getRealIdx(idx) ? 'selected' : ''} onClick={() => handleRowClick(idx)} style={{cursor:'pointer'}}>
                     <td>{tx.Name}</td>
                     <td>{tx.Date}</td>
-                    <td>{tx.Description}</td>
-                    <td>{tx.Reference}</td>
+                    {activeTab !== 'received' && <td>{tx.Description}</td>}
+                    {activeTab !== 'received' && <td>{tx.Reference}</td>}
                     <td>{tx.Amount}</td>
-                    <td>{tx.VAT}</td>
+                    {activeTab === 'purchases' && <td>{tx.VAT}</td>}
                     <td>{tx.Total}</td>
                     <td>{Array.isArray(tx.Actions) ? tx.Actions.join(', ') : tx.Actions}</td>
                     <td>{tx.Done ? '✔️' : ''}</td>
