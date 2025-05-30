@@ -69,13 +69,24 @@ def get_or_create_workbook():
             wb.create_sheet(sheet_name)
             changed = True
         sheet = wb[sheet_name]
-        # Add headers if missing or empty
+        # Fix: Always ensure headers are in the first row, and remove any extra header rows
         if sheet.max_row == 0 or all(cell.value is None for cell in sheet[1]):
             if key == 'received':
                 sheet.append(["Name", "Date", "Amount", "Notes", "Method", "Actions", "Done"])
             else:
                 sheet.append(["Name", "Date", "Description", "Reference", "Amount", "VAT", "Total", "Actions", "Done"])
             changed = True
+        # Remove duplicate header rows (keep only the first row as header)
+        header_values = [cell.value for cell in sheet[1]]
+        rows_to_delete = []
+        for i, row in enumerate(sheet.iter_rows(min_row=2, max_row=sheet.max_row), start=2):
+            if [cell.value for cell in row] == header_values:
+                rows_to_delete.append(i)
+        for i in reversed(rows_to_delete):
+            sheet.delete_rows(i)
+        # Also, if the first row is empty, remove it
+        if all(cell.value is None for cell in sheet[1]):
+            sheet.delete_rows(1)
     if changed:
         wb.save(EXCEL_FILE)
     return wb
