@@ -272,7 +272,6 @@ function App() {
         date: form.date,
         amount: parseFloat(form.amount),
         notes: form.notes || '',
-        method: receivedMethod,
         actions,
         done: false,
       };
@@ -289,7 +288,7 @@ function App() {
           setActions([]);
         } else {
           const data = await res.json();
-          setMessage(data.detail || 'Error saving payment');
+          setMessage(typeof data.detail === 'string' ? data.detail : 'Error saving payment');
         }
       } catch (err) {
         setMessage('Network error');
