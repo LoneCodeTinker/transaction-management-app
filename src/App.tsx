@@ -272,6 +272,7 @@ function App() {
         date: form.date,
         amount: parseFloat(form.amount),
         notes: form.notes || '',
+        method: receivedMethod, // send method to backend
         actions,
         done: false,
       };
