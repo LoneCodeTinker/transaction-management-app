@@ -62,11 +62,19 @@ def get_or_create_workbook():
             del wb['Sheet']
         wb.save(EXCEL_FILE)
         wb = openpyxl.load_workbook(EXCEL_FILE)
-    # Ensure all required sheets exist
+    # Ensure all required sheets exist and have correct headers
     changed = False
-    for sheet in SHEET_NAMES.values():
-        if sheet not in wb.sheetnames:
-            wb.create_sheet(sheet)
+    for key, sheet_name in SHEET_NAMES.items():
+        if sheet_name not in wb.sheetnames:
+            wb.create_sheet(sheet_name)
+            changed = True
+        sheet = wb[sheet_name]
+        # Add headers if missing or empty
+        if sheet.max_row == 0 or all(cell.value is None for cell in sheet[1]):
+            if key == 'received':
+                sheet.append(["Name", "Date", "Amount", "Notes", "Method", "Actions", "Done"])
+            else:
+                sheet.append(["Name", "Date", "Description", "Reference", "Amount", "VAT", "Total", "Actions", "Done"])
             changed = True
     if changed:
         wb.save(EXCEL_FILE)
