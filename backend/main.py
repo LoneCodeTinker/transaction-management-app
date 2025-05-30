@@ -27,15 +27,16 @@ EXCEL_FILE = "transactions.xlsx"
 SHEET_NAMES = {"sales": "Sales", "received": "Received", "purchases": "Purchases", "expenses": "Expenses"}
 
 class Transaction(BaseModel):
-    type: str  # sales, purchases, expenses
+    type: str  # sales, purchases, expenses, received
     name: str  # vendor or customer
     date: date
     description: Optional[str] = None
     reference: Optional[str] = None
     amount: float
-    vat: float
+    vat: float = 0
     total: float
-    actions: Optional[List[str]] = None  # Change default to None
+    method: Optional[str] = None  # Only for received
+    actions: Optional[List[str]] = None
     done: bool = False
 
 
@@ -76,14 +77,24 @@ def save_transaction_to_excel(tx: Transaction):
     wb = get_or_create_workbook()
     sheet = wb[SHEET_NAMES[tx.type]]
     if sheet.max_row == 1:
-        sheet.append([
-            "Name", "Date", "Description", "Reference", "Amount", "VAT", "Total", "Actions", "Done"
-        ])
+        if tx.type == 'received':
+            sheet.append([
+                "Name", "Date", "Amount", "Notes", "Method", "Actions", "Done"
+            ])
+        else:
+            sheet.append([
+                "Name", "Date", "Description", "Reference", "Amount", "VAT", "Total", "Actions", "Done"
+            ])
     # Ensure actions is always a list
     actions = tx.actions if tx.actions is not None else []
-    sheet.append([
-        tx.name, tx.date.isoformat(), tx.description, tx.reference, tx.amount, tx.vat, tx.total, ','.join(actions), tx.done
-    ])
+    if tx.type == 'received':
+        sheet.append([
+            tx.name, tx.date.isoformat(), tx.amount, tx.description, tx.method, ','.join(actions), tx.done
+        ])
+    else:
+        sheet.append([
+            tx.name, tx.date.isoformat(), tx.description, tx.reference, tx.amount, tx.vat, tx.total, ','.join(actions), tx.done
+        ])
     wb.save(EXCEL_FILE)
 
 
@@ -97,11 +108,13 @@ def read_transactions_from_excel(tx_type: str):
     transactions = []
     for row in rows[1:]:
         tx = dict(zip(headers, row))
-        # Convert actions from comma string to list, filter out empty strings
-        if tx.get('Actions'):
-            tx['Actions'] = [a for a in tx['Actions'].split(',') if a]
+        if tx_type == 'received':
+            tx['Actions'] = [a for a in (tx.get('Actions') or '').split(',') if a]
         else:
-            tx['Actions'] = []
+            if tx.get('Actions'):
+                tx['Actions'] = [a for a in tx['Actions'].split(',') if a]
+            else:
+                tx['Actions'] = []
         transactions.append(tx)
     return transactions
 
