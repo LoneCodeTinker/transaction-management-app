@@ -150,9 +150,11 @@ function App() {
   // Map filtered index to real index in transactions
   const getRealIdx = (filteredIdx: number) => {
     if (showDone) return filteredIdx;
-    // Find the index in the full transactions array
-    const tx = filteredTxs[filteredIdx];
-    return transactions.findIndex(t => t === tx);
+    // Use a unique key (row index in the original array) to avoid reference issues
+    const filtered = transactions
+      .map((tx, idx) => ({ tx, idx }))
+      .filter(({ tx }) => !tx.Done);
+    return filtered[filteredIdx]?.idx ?? filteredIdx;
   };
 
   const handleRowClick = (idx: number) => {
@@ -565,7 +567,7 @@ function App() {
               </thead>
               <tbody>
                 {filteredTxs.map((tx, idx) => (
-                  <tr key={tx.ID || tx.Reference || idx} className={selectedIdx === getRealIdx(idx) ? 'selected' : ''} onClick={() => handleRowClick(idx)} style={{cursor:'pointer'}}>
+                  <tr key={getRealIdx(idx)} className={selectedIdx === getRealIdx(idx) ? 'selected' : ''} onClick={() => handleRowClick(idx)} style={{cursor:'pointer'}}>
                     <td>{tx.Name}</td>
                     <td>{tx.Date}</td>
                     {activeTab !== 'received' && <td>{tx.Description}</td>}
