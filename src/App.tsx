@@ -480,37 +480,7 @@ function App() {
                 <div style={{marginTop:16}}>
                   <strong>Total: </strong>{salesTotal.toFixed(2)} &nbsp; <strong>VAT: </strong>{salesVATTotal.toFixed(2)} &nbsp; <strong>Total (with VAT): </strong>{salesTotalWithVAT.toFixed(2)}
                 </div>
-                <div style={{marginTop:16}}>
-                  <label>Actions:</label>
-                  <div style={{marginBottom:8}}>
-                    <label style={{marginRight:16}}>
-                      <input
-                        type="checkbox"
-                        checked={actions.includes('Registered in QB')}
-                        onChange={() => setActions(actions => actions.includes('Registered in QB') ? actions.filter(a => a !== 'Registered in QB') : [...actions, 'Registered in QB'])}
-                      />
-                      Registered in QB
-                    </label>
-                    <label style={{marginRight:8}}>
-                      <input
-                        type="checkbox"
-                        checked={actions.includes('Paid')}
-                        onChange={() => setActions(actions => actions.includes('Paid') ? actions.filter(a => a !== 'Paid') : [...actions, 'Paid'])}
-                      />
-                      Paid
-                    </label>
-                    {actions.includes('Paid') && (
-                      <span style={{marginLeft:8}}>
-                        <label style={{marginRight:8}}>
-                          <input type="radio" name="paidStatus" value="partial" checked={paidStatus === 'partial'} onChange={() => handlePaidStatusChange('partial')} /> Partially
-                        </label>
-                        <label>
-                          <input type="radio" name="paidStatus" value="full" checked={paidStatus === 'full'} onChange={() => handlePaidStatusChange('full')} /> Full amount
-                        </label>
-                      </span>
-                    )}
-                  </div>
-                </div>
+                {/* Remove actions UI from add form for sales tab */}
               </>
             ) : activeTab === 'received' ? (
               <>
