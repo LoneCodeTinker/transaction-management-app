@@ -177,7 +177,14 @@ function App() {
     });
   };
   const handleAddSalesItem = () => {
-    setSalesItems(items => [...items, { description: '', quantity: 1, price: 0, total: 0, vat: 0 }]);
+    setSalesItems(items => {
+      const newItems = [...items, { description: '', quantity: 1, price: 0, total: 0, vat: 0 }];
+      setTimeout(() => {
+        const idx = newItems.length - 1;
+        descriptionRefs.current[idx]?.focus();
+      }, 0);
+      return newItems;
+    });
   };
   const handleRemoveSalesItem = (idx: number) => {
     setSalesItems(items => items.length > 1 ? items.filter((_, i) => i !== idx) : items);
@@ -408,6 +415,15 @@ function App() {
   // Replace ACTIONS with per-tab actions
   const actionsList = TAB_ACTIONS[activeTab] || [];
 
+  const descriptionRefs = React.useRef<Array<HTMLInputElement | null>>([]);
+
+  // Add useEffect to focus the last description input when salesItems changes:
+  React.useEffect(() => {
+    if (descriptionRefs.current[salesItems.length - 1]) {
+      descriptionRefs.current[salesItems.length - 1]?.focus();
+    }
+  }, [salesItems.length]);
+
   return (
     <div className="container">
       <h1>Transaction Management</h1>
@@ -439,32 +455,42 @@ function App() {
                 <div style={{marginTop:16}}>
                   <label>Items:</label>
                   <div style={{overflowX:'auto'}}>
-                  <table className="sales-items-table" style={{minWidth:600}}>
-                    <thead>
-                      <tr>
-                        <th style={{minWidth:220, width:220}}>Item Description</th>
-                        <th style={{minWidth:100, width:100}}>Quantity</th>
-                        <th style={{minWidth:100, width:100}}>Price</th>
-                        <th style={{minWidth:100, width:100}}>Total</th>
-                        <th style={{minWidth:100, width:100}}>VAT 15%</th>
-                        <th style={{width:40}}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {salesItems.map((item, idx) => (
-                        <tr key={idx}>
-                          <td><input style={{width:'100%'}} value={item.description} onChange={e => handleSalesItemChange(idx, 'description', e.target.value)} /></td>
-                          <td><input type="number" min="1" value={item.quantity} onChange={e => handleSalesItemChange(idx, 'quantity', e.target.value)} style={{width:'100%'}} /></td>
-                          <td><input type="number" min="0" step="0.01" value={item.price} onChange={e => handleSalesItemChange(idx, 'price', e.target.value)} style={{width:'100%'}} /></td>
-                          <td>{Number(item.total).toFixed(2)}</td>
-                          <td>{Number(item.vat).toFixed(2)}</td>
-                          <td>{salesItems.length > 1 && <button type="button" onClick={() => handleRemoveSalesItem(idx)}>-</button>}</td>
+                    <table className="sales-items-table" style={{minWidth:600}}>
+                      <thead>
+                        <tr>
+                          <th style={{minWidth:220, width:220}}>Item Description</th>
+                          <th style={{minWidth:100, width:100}}>Quantity</th>
+                          <th style={{minWidth:100, width:100}}>Price</th>
+                          <th style={{minWidth:100, width:100}}>Total</th>
+                          <th style={{minWidth:100, width:100}}>VAT 15%</th>
+                          <th style={{width:40}}></th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {salesItems.map((item, idx) => (
+                          <tr key={idx}>
+                            <td><input
+                              style={{width:'100%'}}
+                              value={item.description}
+                              onChange={e => handleSalesItemChange(idx, 'description', e.target.value)}
+                              ref={el => { descriptionRefs.current[idx] = el; }}
+                            /></td>
+                            <td><input type="number" min="1" value={item.quantity} onChange={e => handleSalesItemChange(idx, 'quantity', e.target.value)} style={{width:'100%'}} /></td>
+                            <td><input type="number" min="0" step="0.01" value={item.price} onChange={e => handleSalesItemChange(idx, 'price', e.target.value)} style={{width:'100%'}} /></td>
+                            <td>{Number(item.total).toFixed(2)}</td>
+                            <td>{Number(item.vat).toFixed(2)}</td>
+                            <td>{salesItems.length > 1 && <button type="button" onClick={() => handleRemoveSalesItem(idx)}>-</button>}</td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td colSpan={5}></td>
+                          <td>
+                            <button type="button" onClick={handleAddSalesItem} style={{marginTop:4}}>+</button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
-                  <button type="button" onClick={handleAddSalesItem} style={{marginTop:4}}>+ Add Item</button>
                   <div style={{marginTop:8}}>
                     <label><input type="checkbox" checked={salesVAT} onChange={handleSalesVATChange} /> VAT 15% (uncheck for non-tax customers)</label>
                   </div>
