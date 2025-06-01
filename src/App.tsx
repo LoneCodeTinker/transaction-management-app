@@ -603,18 +603,77 @@ function App() {
             }}>
               <div>
                 <label>Actions:</label>
-                {actionsList.map(action => (
-                  <div key={action}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={editActions.includes(action)}
-                        onChange={() => handleEditActionChange(action)}
-                      />
-                      {action}
-                    </label>
-                  </div>
-                ))}
+                {activeTab === 'sales' ? (
+                  <>
+                    <div>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={editActions.includes('Registered in QB')}
+                          onChange={() => handleEditActionChange('Registered in QB')}
+                        />
+                        Registered in QB
+                      </label>
+                    </div>
+                    <div>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={editActions.includes('Paid')}
+                          onChange={() => handleEditActionChange('Paid')}
+                        />
+                        Paid
+                      </label>
+                      {editActions.includes('Paid') && (
+                        <span style={{marginLeft:8}}>
+                          <label style={{marginRight:8}}>
+                            <input
+                              type="radio"
+                              name="editPaidStatus"
+                              value="partial"
+                              checked={editActions.includes('Paid:partial')}
+                              onChange={() => {
+                                setEditActions(actions => [
+                                  ...actions.filter(a => !a.startsWith('Paid:')),
+                                  'Paid',
+                                  'Paid:partial',
+                                ]);
+                              }}
+                            /> Partially
+                          </label>
+                          <label>
+                            <input
+                              type="radio"
+                              name="editPaidStatus"
+                              value="full"
+                              checked={editActions.includes('Paid:full')}
+                              onChange={() => {
+                                setEditActions(actions => [
+                                  ...actions.filter(a => !a.startsWith('Paid:')),
+                                  'Paid',
+                                  'Paid:full',
+                                ]);
+                              }}
+                            /> Full amount
+                          </label>
+                        </span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  actionsList.map(action => (
+                    <div key={action}>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={editActions.includes(action)}
+                          onChange={() => handleEditActionChange(action)}
+                        />
+                        {action}
+                      </label>
+                    </div>
+                  ))
+                )}
               </div>
               <div>
                 <label>
