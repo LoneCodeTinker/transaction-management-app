@@ -41,15 +41,12 @@ const TAB_FIELDS: Record<string, Array<{name: string, label: string, type?: stri
 
 const TAB_ACTIONS: Record<string, string[]> = {
   sales: [
-    'Scanned the bill',
-    'Registered in the system',
-    'Paid?',
-    'Registered the payment in the system',
+    'Registered in QB',
+    'Paid', // Will trigger radio for partial/full
   ],
   received: [
-    'Received in cash',
-    'Received in bank',
-    'Receipt issued',
+    'Recorded in Journal',
+    'Recorded in QB',
   ],
   purchases: [
     'Scanned the bill',
@@ -99,6 +96,8 @@ function App() {
   const [showDone, setShowDone] = useState(false);
   // Add payment method state for received tab
   const [receivedMethod, setReceivedMethod] = useState<'cash' | 'bank'>('cash');
+  // Paid status for sales tab
+  const [paidStatus, setPaidStatus] = useState<'none' | 'partial' | 'full'>('none');
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -200,6 +199,12 @@ function App() {
     }));
   };
 
+  const handlePaidStatusChange = (status: 'partial' | 'full') => {
+    setPaidStatus(status);
+    // Ensure 'Paid' is in actions if any radio is selected
+    if (!actions.includes('Paid')) setActions([...actions, 'Paid']);
+  };
+
   // Calculate totals for sales
   const salesTotal = salesItems.reduce((sum, item) => sum + (parseFloat(item.total as any) || 0), 0);
   const salesVATTotal = salesItems.reduce((sum, item) => sum + (parseFloat(item.vat as any) || 0), 0);
@@ -237,7 +242,8 @@ function App() {
         amount: salesTotal,
         vat: salesVATTotal,
         total: salesTotalWithVAT,
-        actions: [],
+        actions: actions,
+        paidStatus: paidStatus === 'none' ? undefined : paidStatus, // Optionally send paid status
         done: false,
       };
       try {
@@ -252,6 +258,8 @@ function App() {
           setSalesItems([{ description: '', quantity: 1, price: 0, total: 0, vat: 0 }]);
           setSalesVAT(true);
           setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' } });
+          setActions([]);
+          setPaidStatus('none');
         } else {
           const data = await res.json();
           setMessage(data.detail || 'Error saving transaction');
@@ -471,6 +479,37 @@ function App() {
                 </div>
                 <div style={{marginTop:16}}>
                   <strong>Total: </strong>{salesTotal.toFixed(2)} &nbsp; <strong>VAT: </strong>{salesVATTotal.toFixed(2)} &nbsp; <strong>Total (with VAT): </strong>{salesTotalWithVAT.toFixed(2)}
+                </div>
+                <div style={{marginTop:16}}>
+                  <label>Actions:</label>
+                  <div style={{marginBottom:8}}>
+                    <label style={{marginRight:16}}>
+                      <input
+                        type="checkbox"
+                        checked={actions.includes('Registered in QB')}
+                        onChange={() => setActions(actions => actions.includes('Registered in QB') ? actions.filter(a => a !== 'Registered in QB') : [...actions, 'Registered in QB'])}
+                      />
+                      Registered in QB
+                    </label>
+                    <label style={{marginRight:8}}>
+                      <input
+                        type="checkbox"
+                        checked={actions.includes('Paid')}
+                        onChange={() => setActions(actions => actions.includes('Paid') ? actions.filter(a => a !== 'Paid') : [...actions, 'Paid'])}
+                      />
+                      Paid
+                    </label>
+                    {actions.includes('Paid') && (
+                      <span style={{marginLeft:8}}>
+                        <label style={{marginRight:8}}>
+                          <input type="radio" name="paidStatus" value="partial" checked={paidStatus === 'partial'} onChange={() => handlePaidStatusChange('partial')} /> Partially
+                        </label>
+                        <label>
+                          <input type="radio" name="paidStatus" value="full" checked={paidStatus === 'full'} onChange={() => handlePaidStatusChange('full')} /> Full amount
+                        </label>
+                      </span>
+                    )}
+                  </div>
                 </div>
               </>
             ) : activeTab === 'received' ? (
