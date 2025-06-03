@@ -98,6 +98,12 @@ function App() {
   const [receivedMethod, setReceivedMethod] = useState<'cash' | 'bank'>('cash');
   // Paid status for sales tab
   const [paidStatus, setPaidStatus] = useState<'none' | 'partial' | 'full'>('none');
+  // Add state and handlers for editReferenceFields at the top of App():
+  const [editReferenceFields, setEditReferenceFields] = useState<ReferenceFields>({
+    quotation: { checked: false, value: '' },
+    invoice: { checked: false, value: '' },
+    qb: { checked: false, value: '' },
+  });
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -123,6 +129,30 @@ function App() {
     setEditActions([]);
     setEditDone(false);
   }, [activeTab, showDone]); // add showDone to dependencies
+
+  // When a transaction is selected for editing, initialize editReferenceFields:
+  useEffect(() => {
+    if (selectedIdx !== null && activeTab === 'sales') {
+      const tx = transactions[selectedIdx];
+      // Parse references from tx.Reference string
+      const ref: ReferenceFields = {
+        quotation: { checked: false, value: '' },
+        invoice: { checked: false, value: '' },
+        qb: { checked: false, value: '' },
+      };
+      if (tx && tx.Reference) {
+        const refStr: string = tx.Reference;
+        const match = (type: string) => {
+          const m = refStr.match(new RegExp(type + '#(\\d+)', 'i'));
+          return m ? m[1] : '';
+        };
+        if (/Quotation#/.test(refStr)) ref.quotation = { checked: true, value: match('Quotation') };
+        if (/Invoice#/.test(refStr)) ref.invoice = { checked: true, value: match('Invoice') };
+        if (/QB#/.test(refStr)) ref.qb = { checked: true, value: match('QB') };
+      }
+      setEditReferenceFields(ref);
+    }
+  }, [selectedIdx, activeTab, transactions]);
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -198,6 +228,16 @@ function App() {
   };
   const handleReferenceChange = (key: string, checked: boolean, value?: string) => {
     setReferenceFields(refs => ({
+      ...refs,
+      [key]: {
+        checked,
+        value: value !== undefined ? value : refs[key]?.value || ''
+      }
+    }));
+  };
+  // Handler for editReferenceFields:
+  const handleEditReferenceChange = (key: string, checked: boolean, value?: string) => {
+    setEditReferenceFields(refs => ({
       ...refs,
       [key]: {
         checked,
@@ -394,11 +434,21 @@ function App() {
   const handleUpdate = async () => {
     if (selectedIdx === null) return;
     setMessage('');
+    let updatePayload: any = { Actions: editActions, Done: editDone };
+    if (activeTab === 'sales') {
+      // Compose reference string
+      const refStr = [
+        editReferenceFields.quotation.checked ? `Quotation#${editReferenceFields.quotation.value}` : null,
+        editReferenceFields.invoice.checked ? `Invoice#${editReferenceFields.invoice.value}` : null,
+        editReferenceFields.qb.checked ? `QB#${editReferenceFields.qb.value}` : null
+      ].filter(Boolean).join(', ');
+      updatePayload.Reference = refStr;
+    }
     try {
       const res = await fetch(`/transactions/${activeTab}/${selectedIdx}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ Actions: editActions, Done: editDone }),
+        body: JSON.stringify(updatePayload),
       });
       if (res.ok) {
         setMessage('Transaction updated!');
@@ -684,6 +734,15 @@ function App() {
                           </label>
                         </span>
                       )}
+                    </div>
+                    {/* References UI for edit panel */}
+                    <div style={{marginTop:16}}>
+                      <label>References:</label>
+                      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                        <label><input type="checkbox" checked={editReferenceFields.quotation.checked} onChange={e => handleEditReferenceChange('quotation', e.target.checked)} /> Formal Quotation # <input type="number" style={{width:70}} value={editReferenceFields.quotation.value} onChange={e => handleEditReferenceChange('quotation', true, e.target.value)} disabled={!editReferenceFields.quotation.checked} /></label>
+                        <label><input type="checkbox" checked={editReferenceFields.invoice.checked} onChange={e => handleEditReferenceChange('invoice', e.target.checked)} /> Formal Invoice # <input type="number" style={{width:70}} value={editReferenceFields.invoice.value} onChange={e => handleEditReferenceChange('invoice', true, e.target.value)} disabled={!editReferenceFields.invoice.checked} /></label>
+                        <label><input type="checkbox" checked={editReferenceFields.qb.checked} onChange={e => handleEditReferenceChange('qb', e.target.checked)} /> QB # <input type="number" style={{width:70}} value={editReferenceFields.qb.value} onChange={e => handleEditReferenceChange('qb', true, e.target.value)} disabled={!editReferenceFields.qb.checked} /></label>
+                      </div>
                     </div>
                   </>
                 ) : (
