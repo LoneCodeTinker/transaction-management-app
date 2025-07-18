@@ -82,6 +82,10 @@ function App() {
     minAmount: '',
     maxAmount: '',
     reference: '',
+    datePreset: 'all', // new: preset selector
+    customDate: '', // for custom single date
+    rangeStart: '', // for date range
+    rangeEnd: '',
   });
 
   useEffect(() => {
@@ -182,18 +186,84 @@ function App() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // Filtered transactions with filter options
+  // Helper to get date boundaries
+  function getDateRange(preset: string) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let start: Date | null = null, end: Date | null = null;
+    switch (preset) {
+      case 'today':
+        start = end = today;
+        break;
+      case 'yesterday':
+        start = end = new Date(today.getTime() - 86400000);
+        break;
+      case 'thisweek': {
+        const day = today.getDay() || 7;
+        start = new Date(today);
+        start.setDate(today.getDate() - day + 1);
+        end = today;
+        break;
+      }
+      case 'lastweek': {
+        const day = today.getDay() || 7;
+        end = new Date(today);
+        end.setDate(today.getDate() - day);
+        start = new Date(end);
+        start.setDate(end.getDate() - 6);
+        break;
+      }
+      case 'thismonth':
+        start = new Date(today.getFullYear(), today.getMonth(), 1);
+        end = today;
+        break;
+      case 'lastmonth': {
+        const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const last = new Date(today.getFullYear(), today.getMonth(), 0);
+        start = first;
+        end = last;
+        break;
+      }
+      case 'thisyear':
+        start = new Date(today.getFullYear(), 0, 1);
+        end = today;
+        break;
+      default:
+        start = end = null;
+    }
+    return { start, end };
+  }
+
+  // Filtered transactions with filter options (including date presets)
   const filteredTxs = (showDone ? transactions : transactions.filter(tx => !tx.Done)).filter(tx => {
     // Name filter (case-insensitive substring)
     if (filter.name && !(tx.Name || '').toLowerCase().includes(filter.name.toLowerCase())) return false;
-    // Date filter (exact match)
-    if (filter.date && tx.Date !== filter.date) return false;
     // Reference filter (case-insensitive substring)
     if (filter.reference && !(tx.Reference || '').toLowerCase().includes(filter.reference.toLowerCase())) return false;
     // Min amount
     if (filter.minAmount && Number(tx.Amount) < Number(filter.minAmount)) return false;
     // Max amount
     if (filter.maxAmount && Number(tx.Amount) > Number(filter.maxAmount)) return false;
+    // Date filtering
+    const txDate = tx.Date ? new Date(tx.Date) : null;
+    if (filter.datePreset && filter.datePreset !== 'all') {
+      if (filter.datePreset === 'custom') {
+        if (filter.customDate && txDate?.toISOString().slice(0,10) !== filter.customDate) return false;
+      } else if (filter.datePreset === 'range') {
+        if (filter.rangeStart && filter.rangeEnd) {
+          const start = new Date(filter.rangeStart);
+          const end = new Date(filter.rangeEnd);
+          if (!txDate || txDate < start || txDate > end) return false;
+        }
+      } else {
+        const { start, end } = getDateRange(filter.datePreset);
+        if (start && end && txDate) {
+          if (txDate < start || txDate > end) return false;
+        }
+      }
+    } else if (filter.date) {
+      if (txDate?.toISOString().slice(0,10) !== filter.date) return false;
+    }
     return true;
   });
 
@@ -652,9 +722,38 @@ function App() {
               <input type="text" value={filter.name} onChange={e => setFilter(f => ({...f, name: e.target.value}))} placeholder="Search name" style={{width:120}} />
             </div>
             <div>
-              <label style={{fontWeight:400}}>Date:</label><br/>
-              <input type="date" value={filter.date} onChange={e => setFilter(f => ({...f, date: e.target.value}))} style={{width:140}} />
+              <label style={{fontWeight:400}}>Date Filter:</label><br/>
+              <select value={filter.datePreset} onChange={e => setFilter(f => ({...f, datePreset: e.target.value, customDate:'', rangeStart:'', rangeEnd:'', date:''}))} style={{width:150}}>
+                <option value="all">All Dates</option>
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="thisweek">This Week</option>
+                <option value="lastweek">Last Week</option>
+                <option value="thismonth">This Month</option>
+                <option value="lastmonth">Last Month</option>
+                <option value="thisyear">This Year</option>
+                <option value="custom">Custom Date</option>
+                <option value="range">Date Range</option>
+              </select>
             </div>
+            {filter.datePreset === 'custom' && (
+              <div>
+                <label style={{fontWeight:400}}>Date:</label><br/>
+                <input type="date" value={filter.customDate} onChange={e => setFilter(f => ({...f, customDate: e.target.value}))} style={{width:140}} />
+              </div>
+            )}
+            {filter.datePreset === 'range' && (
+              <>
+                <div>
+                  <label style={{fontWeight:400}}>From:</label><br/>
+                  <input type="date" value={filter.rangeStart} onChange={e => setFilter(f => ({...f, rangeStart: e.target.value}))} style={{width:120}} />
+                </div>
+                <div>
+                  <label style={{fontWeight:400}}>To:</label><br/>
+                  <input type="date" value={filter.rangeEnd} onChange={e => setFilter(f => ({...f, rangeEnd: e.target.value}))} style={{width:120}} />
+                </div>
+              </>
+            )}
             {activeTab !== 'received' && (
               <div>
                 <label style={{fontWeight:400}}>Reference:</label><br/>
@@ -669,7 +768,7 @@ function App() {
               <label style={{fontWeight:400}}>Max Amount:</label><br/>
               <input type="number" value={filter.maxAmount} onChange={e => setFilter(f => ({...f, maxAmount: e.target.value}))} placeholder="Max" style={{width:90}} />
             </div>
-            <button type="button" onClick={() => setFilter({name:'',date:'',minAmount:'',maxAmount:'',reference:''})} style={{height:36}}>Clear</button>
+            <button type="button" onClick={() => setFilter({name:'',date:'',minAmount:'',maxAmount:'',reference:'',datePreset:'all',customDate:'',rangeStart:'',rangeEnd:''})} style={{height:36}}>Clear</button>
           </div>
           <label style={{marginBottom:8,display:'block'}}>
             <input type="checkbox" checked={showDone} onChange={e => setShowDone(e.target.checked)} /> Show Done Transactions
