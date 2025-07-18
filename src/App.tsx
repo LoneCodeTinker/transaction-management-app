@@ -186,21 +186,6 @@ function App() {
     return filtered[filteredIdx]?.idx ?? filteredIdx;
   };
 
-  const handleRowClick = (idx: number) => {
-    const realIdx = getRealIdx(idx);
-    setEditIdx(realIdx);
-    setForm({
-      name: transactions[realIdx].Name || '',
-      date: transactions[realIdx].Date || today,
-      description: transactions[realIdx].Description || '',
-      reference: transactions[realIdx].Reference || '',
-      amount: transactions[realIdx].Amount?.toString() || '',
-      vat: transactions[realIdx].VAT?.toString() || '',
-      total: transactions[realIdx].Total?.toString() || '',
-      notes: transactions[realIdx].Description || '', // for received
-    });
-  };
-
   // Handle sales items table changes
   const handleSalesItemChange = (idx: number, field: string, value: string | number) => {
     setSalesItems(items => {
@@ -617,6 +602,19 @@ function App() {
               </label>
             </div>
             <button type="submit">{editIdx !== null ? 'Update' : 'Save'}</button>
+            {editIdx !== null && (
+              <button type="button" onClick={() => {
+                setEditIdx(null);
+                setForm({ name: '', date: today });
+                setSalesItems([{ description: '', quantity: 1, price: 0, total: 0, vat: 0 }]);
+                setSalesVAT(true);
+                setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' } });
+                setActions([]);
+                setPaidStatus('none');
+                setShowDone(false);
+                setReceivedMethod('cash');
+              }}>Cancel</button>
+            )}
           </form>
           {message && <div className="message">{message}</div>}
         </section>
@@ -646,7 +644,7 @@ function App() {
               </thead>
               <tbody>
                 {filteredTxs.map((tx, idx) => (
-                  <tr key={getRealIdx(idx)} className={editIdx === getRealIdx(idx) ? 'selected' : ''} onClick={() => handleRowClick(idx)} style={{cursor:'pointer'}}>
+                  <tr key={getRealIdx(idx)}>
                     <td>{tx.Name}</td>
                     <td>{tx.Date}</td>
                     {activeTab !== 'received' && <td>{tx.Description}</td>}
