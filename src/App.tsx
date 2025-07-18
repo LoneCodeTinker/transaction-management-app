@@ -186,23 +186,31 @@ function App() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // Helper to get date boundaries
+  // Set default filter to 'thismonth' on mount
+  React.useEffect(() => {
+    setFilter(f => ({ ...f, datePreset: 'thismonth' }));
+  }, []);
+
+  // Helper to get date boundaries (fix: use local date string for comparison)
   function getDateRange(preset: string) {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     let start: Date | null = null, end: Date | null = null;
     switch (preset) {
       case 'today':
-        start = end = today;
+        start = new Date(today);
+        end = new Date(today);
         break;
       case 'yesterday':
-        start = end = new Date(today.getTime() - 86400000);
+        start = new Date(today);
+        start.setDate(today.getDate() - 1);
+        end = new Date(start);
         break;
       case 'thisweek': {
         const day = today.getDay() || 7;
         start = new Date(today);
         start.setDate(today.getDate() - day + 1);
-        end = today;
+        end = new Date(today);
         break;
       }
       case 'lastweek': {
@@ -215,18 +223,18 @@ function App() {
       }
       case 'thismonth':
         start = new Date(today.getFullYear(), today.getMonth(), 1);
-        end = today;
+        end = new Date(today);
         break;
       case 'lastmonth': {
         const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         const last = new Date(today.getFullYear(), today.getMonth(), 0);
-        start = first;
-        end = last;
+        start = new Date(first);
+        end = new Date(last);
         break;
       }
       case 'thisyear':
         start = new Date(today.getFullYear(), 0, 1);
-        end = today;
+        end = new Date(today);
         break;
       default:
         start = end = null;
@@ -244,25 +252,25 @@ function App() {
     if (filter.minAmount && Number(tx.Amount) < Number(filter.minAmount)) return false;
     // Max amount
     if (filter.maxAmount && Number(tx.Amount) > Number(filter.maxAmount)) return false;
-    // Date filtering
-    const txDate = tx.Date ? new Date(tx.Date) : null;
+    // Date filtering (fix: compare yyyy-mm-dd strings for today/yesterday)
+    const txDateStr = tx.Date ? tx.Date.slice(0, 10) : '';
     if (filter.datePreset && filter.datePreset !== 'all') {
       if (filter.datePreset === 'custom') {
-        if (filter.customDate && txDate?.toISOString().slice(0,10) !== filter.customDate) return false;
+        if (filter.customDate && txDateStr !== filter.customDate) return false;
       } else if (filter.datePreset === 'range') {
         if (filter.rangeStart && filter.rangeEnd) {
-          const start = new Date(filter.rangeStart);
-          const end = new Date(filter.rangeEnd);
-          if (!txDate || txDate < start || txDate > end) return false;
+          if (!txDateStr || txDateStr < filter.rangeStart || txDateStr > filter.rangeEnd) return false;
         }
       } else {
         const { start, end } = getDateRange(filter.datePreset);
-        if (start && end && txDate) {
-          if (txDate < start || txDate > end) return false;
+        if (start && end && txDateStr) {
+          const startStr = start.toISOString().slice(0, 10);
+          const endStr = end.toISOString().slice(0, 10);
+          if (txDateStr < startStr || txDateStr > endStr) return false;
         }
       }
     } else if (filter.date) {
-      if (txDate?.toISOString().slice(0,10) !== filter.date) return false;
+      if (txDateStr !== filter.date) return false;
     }
     return true;
   });
