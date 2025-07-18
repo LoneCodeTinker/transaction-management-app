@@ -75,6 +75,14 @@ function App() {
   const [paidStatus, setPaidStatus] = useState<'none' | 'partial' | 'full'>('none');
   // Add edit mode state
   const [editIdx, setEditIdx] = useState<number | null>(null);
+  // Filter state for transactions list
+  const [filter, setFilter] = useState({
+    name: '',
+    date: '',
+    minAmount: '',
+    maxAmount: '',
+    reference: '',
+  });
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -174,7 +182,20 @@ function App() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const filteredTxs = showDone ? transactions : transactions.filter(tx => !tx.Done);
+  // Filtered transactions with filter options
+  const filteredTxs = (showDone ? transactions : transactions.filter(tx => !tx.Done)).filter(tx => {
+    // Name filter (case-insensitive substring)
+    if (filter.name && !(tx.Name || '').toLowerCase().includes(filter.name.toLowerCase())) return false;
+    // Date filter (exact match)
+    if (filter.date && tx.Date !== filter.date) return false;
+    // Reference filter (case-insensitive substring)
+    if (filter.reference && !(tx.Reference || '').toLowerCase().includes(filter.reference.toLowerCase())) return false;
+    // Min amount
+    if (filter.minAmount && Number(tx.Amount) < Number(filter.minAmount)) return false;
+    // Max amount
+    if (filter.maxAmount && Number(tx.Amount) > Number(filter.maxAmount)) return false;
+    return true;
+  });
 
   // Map filtered index to real index in transactions
   const getRealIdx = (filteredIdx: number) => {
@@ -624,6 +645,32 @@ function App() {
         </section>
         <section className="list-section">
           <h3>Transactions List</h3>
+          {/* Filter UI */}
+          <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:12,alignItems:'flex-end'}}>
+            <div>
+              <label style={{fontWeight:400}}>Name:</label><br/>
+              <input type="text" value={filter.name} onChange={e => setFilter(f => ({...f, name: e.target.value}))} placeholder="Search name" style={{width:120}} />
+            </div>
+            <div>
+              <label style={{fontWeight:400}}>Date:</label><br/>
+              <input type="date" value={filter.date} onChange={e => setFilter(f => ({...f, date: e.target.value}))} style={{width:140}} />
+            </div>
+            {activeTab !== 'received' && (
+              <div>
+                <label style={{fontWeight:400}}>Reference:</label><br/>
+                <input type="text" value={filter.reference} onChange={e => setFilter(f => ({...f, reference: e.target.value}))} placeholder="Search ref" style={{width:120}} />
+              </div>
+            )}
+            <div>
+              <label style={{fontWeight:400}}>Min Amount:</label><br/>
+              <input type="number" value={filter.minAmount} onChange={e => setFilter(f => ({...f, minAmount: e.target.value}))} placeholder="Min" style={{width:90}} />
+            </div>
+            <div>
+              <label style={{fontWeight:400}}>Max Amount:</label><br/>
+              <input type="number" value={filter.maxAmount} onChange={e => setFilter(f => ({...f, maxAmount: e.target.value}))} placeholder="Max" style={{width:90}} />
+            </div>
+            <button type="button" onClick={() => setFilter({name:'',date:'',minAmount:'',maxAmount:'',reference:''})} style={{height:36}}>Clear</button>
+          </div>
           <label style={{marginBottom:8,display:'block'}}>
             <input type="checkbox" checked={showDone} onChange={e => setShowDone(e.target.checked)} /> Show Done Transactions
           </label>
