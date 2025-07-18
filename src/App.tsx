@@ -307,7 +307,7 @@ function App() {
         });
         if (res.ok) {
           setMessage('Transaction saved!');
-          setForm({ name: '', date: '' });
+          setForm({ name: '', date: today });
           setSalesItems([{ description: '', quantity: 1, price: 0, total: 0, vat: 0 }]);
           setSalesVAT(true);
           setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' } });
@@ -393,7 +393,7 @@ function App() {
         });
         if (res.ok) {
           setMessage('Transaction saved!');
-          setForm({ name: '', date: '', description: '', reference: '', amount: '', vat: '', total: '' });
+          setForm({ name: '', date: today, description: '', reference: '', amount: '', vat: '', total: '' });
           setActions([]);
         } else {
           const data = await res.json();
@@ -426,7 +426,7 @@ function App() {
       });
       if (res.ok) {
         setMessage('Transaction saved!');
-        setForm({ name: '', date: '', description: '', reference: '', amount: '', vat: '', total: '' });
+        setForm({ name: '', date: today, description: '', reference: '', amount: '', vat: '', total: '' });
         setActions([]);
       } else {
         const data = await res.json();
