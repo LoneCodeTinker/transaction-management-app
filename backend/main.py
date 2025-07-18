@@ -145,8 +145,27 @@ def update_transaction_in_excel(tx_type: str, idx: int, updated: dict):
     if idx + 2 > len(rows):
         raise HTTPException(status_code=404, detail="Transaction not found.")
     headers = [cell.value for cell in rows[0]]
+    # Map camelCase keys to Excel header names
+    key_map = {
+        'name': 'Name',
+        'date': 'Date',
+        'description': 'Description',
+        'reference': 'Reference',
+        'amount': 'Amount',
+        'vat': 'VAT',
+        'total': 'Total',
+        'actions': 'Actions',
+        'done': 'Done',
+        'method': 'Method',
+        'notes': 'Notes',
+    }
+    # Build a dict with Excel header keys
+    excel_update = {}
+    for k, v in updated.items():
+        header = key_map.get(k, k)
+        excel_update[header] = v
     for col, key in enumerate(headers):
-        value = updated.get(key, rows[idx+1][col].value)
+        value = excel_update.get(key, rows[idx+1][col].value)
         if key == 'Actions' and isinstance(value, list):
             value = ','.join(value)
         rows[idx+1][col].value = value
