@@ -175,3 +175,17 @@ def update_transaction(tx_type: str, idx: int, updated: dict = Body(...)):
         raise HTTPException(status_code=400, detail="Invalid transaction type.")
     update_transaction_in_excel(tx_type, idx, updated)
     return {"message": "Transaction updated."}
+
+
+@app.delete("/transactions/{tx_type}/{idx}")
+def delete_transaction(tx_type: str, idx: int):
+    if tx_type not in SHEET_NAMES:
+        raise HTTPException(status_code=400, detail="Invalid transaction type.")
+    wb = get_or_create_workbook()
+    sheet = wb[SHEET_NAMES[tx_type]]
+    rows = list(sheet.iter_rows(values_only=False))
+    if idx + 2 > len(rows):
+        raise HTTPException(status_code=404, detail="Transaction not found.")
+    sheet.delete_rows(idx + 2)
+    wb.save(EXCEL_FILE)
+    return {"message": "Transaction deleted."}

@@ -39,28 +39,6 @@ const TAB_FIELDS: Record<string, Array<{name: string, label: string, type?: stri
   ],
 };
 
-const TAB_ACTIONS: Record<string, string[]> = {
-  sales: [
-    'Registered in QB',
-    'Paid', // Will trigger radio for partial/full
-  ],
-  received: [
-    'Recorded in Journal',
-    'Recorded in QB',
-  ],
-  purchases: [
-    'Scanned the bill',
-    'Registered in the system',
-    'Paid?',
-    'Registered the payment in the system',
-  ],
-  expenses: [
-    'Expense approved',
-    'Paid?',
-    'Receipt attached',
-  ],
-};
-
 // Reference fields type with index signature
 interface ReferenceFields {
   [key: string]: { checked: boolean; value: string };
@@ -90,20 +68,13 @@ function App() {
   const [message, setMessage] = useState('');
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
-  const [editActions, setEditActions] = useState<string[]>([]);
-  const [editDone, setEditDone] = useState(false);
   const [showDone, setShowDone] = useState(false);
   // Add payment method state for received tab
   const [receivedMethod, setReceivedMethod] = useState<'cash' | 'bank'>('cash');
   // Paid status for sales tab
   const [paidStatus, setPaidStatus] = useState<'none' | 'partial' | 'full'>('none');
-  // Add state and handlers for editReferenceFields at the top of App():
-  const [editReferenceFields, setEditReferenceFields] = useState<ReferenceFields>({
-    quotation: { checked: false, value: '' },
-    invoice: { checked: false, value: '' },
-    qb: { checked: false, value: '' },
-  });
+  // Add edit mode state
+  const [editIdx, setEditIdx] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -125,53 +96,82 @@ function App() {
   }, [activeTab, message]); // refetch on tab or after save
 
   useEffect(() => {
-    setSelectedIdx(null);
-    setEditActions([]);
-    setEditDone(false);
+    // Reset edit index when tab changes or on save
+    setEditIdx(null);
+    setShowDone(false);
   }, [activeTab, showDone]); // add showDone to dependencies
 
-  // When a transaction is selected for editing, initialize editReferenceFields:
-  useEffect(() => {
-    if (selectedIdx !== null && activeTab === 'sales') {
-      const tx = transactions[selectedIdx];
-      // Parse references from tx.Reference string
+  // When a transaction is selected for editing, initialize form values:
+  const handleEditTransaction = (idx: number) => {
+    const tx = transactions[idx];
+    setEditIdx(idx);
+    setForm({
+      name: tx.Name || '',
+      date: tx.Date || today,
+      description: tx.Description || '',
+      reference: tx.Reference || '',
+      amount: tx.Amount?.toString() || '',
+      vat: tx.VAT?.toString() || '',
+      total: tx.Total?.toString() || '',
+      notes: tx.Description || '', // for received
+    });
+    if (activeTab === 'sales') {
+      setSalesItems(parseSalesDescription(tx.Description));
+      setSalesVAT(!!tx.VAT);
+      // Parse references
       const ref: ReferenceFields = {
-        quotation: { checked: false, value: '' },
-        invoice: { checked: false, value: '' },
-        qb: { checked: false, value: '' },
+        quotation: { checked: /Quotation#/i.test(tx.Reference), value: (tx.Reference?.match(/Quotation#(\d+)/i)?.[1] || '') },
+        invoice: { checked: /Invoice#/i.test(tx.Reference), value: (tx.Reference?.match(/Invoice#(\d+)/i)?.[1] || '') },
+        qb: { checked: /QB#/i.test(tx.Reference), value: (tx.Reference?.match(/QB#(\d+)/i)?.[1] || '') },
       };
-      if (tx && tx.Reference) {
-        const refStr: string = tx.Reference;
-        const match = (type: string) => {
-          const m = refStr.match(new RegExp(type + '#(\\d+)', 'i'));
-          return m ? m[1] : '';
-        };
-        if (/Quotation#/.test(refStr)) ref.quotation = { checked: true, value: match('Quotation') };
-        if (/Invoice#/.test(refStr)) ref.invoice = { checked: true, value: match('Invoice') };
-        if (/QB#/.test(refStr)) ref.qb = { checked: true, value: match('QB') };
-      }
-      setEditReferenceFields(ref);
+      setReferenceFields(ref);
     }
-  }, [selectedIdx, activeTab, transactions]);
+    if (activeTab === 'received') {
+      setReceivedMethod(tx.Method || 'cash');
+    }
+    setShowDone(!!tx.Done);
+  };
+
+  // Helper to parse sales description string into items array
+  function parseSalesDescription(desc: string) {
+    if (!desc) return [{ description: '', quantity: 1, price: 0, total: 0, vat: 0 }];
+    return desc.split(';').map(itemStr => {
+      const m = itemStr.match(/#\d+:\s*(.*?)\s*\|\s*Qty:\s*(\d+)\s*\|\s*Price:\s*([\d.]+)\s*\|\s*Total:\s*([\d.]+)\s*\|\s*VAT:\s*([\d.]+)/i);
+      if (m) {
+        return {
+          description: m[1].trim(),
+          quantity: parseInt(m[2]),
+          price: parseFloat(m[3]),
+          total: parseFloat(m[4]),
+          vat: parseFloat(m[5]),
+        };
+      }
+      // fallback: just description
+      return { description: itemStr.trim(), quantity: 1, price: 0, total: 0, vat: 0 };
+    });
+  }
+
+  // Add handler to delete transaction
+  const handleDeleteTransaction = async (idx: number) => {
+    if (!window.confirm('Are you sure you want to delete this transaction?')) return;
+    try {
+      const res = await fetch(`/transactions/${activeTab}/${idx}`, { method: 'DELETE' });
+      if (res.ok) {
+        setMessage('Transaction deleted!');
+        setEditIdx(null);
+        // Refetch transactions
+        const res2 = await fetch(`/transactions/${activeTab}`);
+        if (res2.ok) setTransactions(await res2.json());
+      } else {
+        setMessage('Error deleting transaction');
+      }
+    } catch {
+      setMessage('Network error');
+    }
+  };
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const handleActionChange = (action: string) => {
-    setActions(prev =>
-      prev.includes(action) ? prev.filter(a => a !== action) : [...prev, action]
-    );
-  };
-
-  const handleEditActionChange = (action: string) => {
-    setEditActions(prev =>
-      prev.includes(action) ? prev.filter(a => a !== action) : [...prev, action]
-    );
-  };
-
-  const handleEditDoneChange = () => {
-    setEditDone(d => !d);
   };
 
   const filteredTxs = showDone ? transactions : transactions.filter(tx => !tx.Done);
@@ -188,9 +188,17 @@ function App() {
 
   const handleRowClick = (idx: number) => {
     const realIdx = getRealIdx(idx);
-    setSelectedIdx(realIdx);
-    setEditActions(Array.isArray(transactions[realIdx].Actions) ? transactions[realIdx].Actions : []);
-    setEditDone(!!transactions[realIdx].Done);
+    setEditIdx(realIdx);
+    setForm({
+      name: transactions[realIdx].Name || '',
+      date: transactions[realIdx].Date || today,
+      description: transactions[realIdx].Description || '',
+      reference: transactions[realIdx].Reference || '',
+      amount: transactions[realIdx].Amount?.toString() || '',
+      vat: transactions[realIdx].VAT?.toString() || '',
+      total: transactions[realIdx].Total?.toString() || '',
+      notes: transactions[realIdx].Description || '', // for received
+    });
   };
 
   // Handle sales items table changes
@@ -235,22 +243,6 @@ function App() {
       }
     }));
   };
-  // Handler for editReferenceFields:
-  const handleEditReferenceChange = (key: string, checked: boolean, value?: string) => {
-    setEditReferenceFields(refs => ({
-      ...refs,
-      [key]: {
-        checked,
-        value: value !== undefined ? value : refs[key]?.value || ''
-      }
-    }));
-  };
-
-  const handlePaidStatusChange = (status: 'partial' | 'full') => {
-    setPaidStatus(status);
-    // Ensure 'Paid' is in actions if any radio is selected
-    if (!actions.includes('Paid')) setActions([...actions, 'Paid']);
-  };
 
   // Calculate totals for sales
   const salesTotal = salesItems.reduce((sum, item) => sum + (parseFloat(item.total as any) || 0), 0);
@@ -279,7 +271,6 @@ function App() {
         setMessage('Customer name and date are required.');
         return;
       }
-      // Transform for backend compatibility
       const payload = {
         type: 'sales',
         name: form.name,
@@ -290,9 +281,39 @@ function App() {
         vat: salesVATTotal,
         total: salesTotalWithVAT,
         actions: actions,
-        paidStatus: paidStatus === 'none' ? undefined : paidStatus, // Optionally send paid status
-        done: false,
+        paidStatus: paidStatus === 'none' ? undefined : paidStatus,
+        done: showDone,
       };
+      if (editIdx !== null) {
+        // Update transaction with full payload
+        try {
+          const res = await fetch(`/transactions/${activeTab}/${editIdx}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (res.ok) {
+            setMessage('Transaction updated!');
+            setEditIdx(null);
+            setForm({ name: '', date: today });
+            setSalesItems([{ description: '', quantity: 1, price: 0, total: 0, vat: 0 }]);
+            setSalesVAT(true);
+            setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' } });
+            setActions([]);
+            setPaidStatus('none');
+            setShowDone(false);
+            // Refetch transactions
+            const res2 = await fetch(`/transactions/${activeTab}`);
+            if (res2.ok) setTransactions(await res2.json());
+          } else {
+            const data = await res.json();
+            setMessage(data.detail || 'Error updating transaction');
+          }
+        } catch {
+          setMessage('Network error');
+        }
+        return;
+      }
       try {
         const res = await fetch('/transaction', {
           method: 'POST',
@@ -430,40 +451,6 @@ function App() {
       setMessage('Network error');
     }
   };
-
-  const handleUpdate = async () => {
-    if (selectedIdx === null) return;
-    setMessage('');
-    let updatePayload: any = { Actions: editActions, Done: editDone };
-    if (activeTab === 'sales') {
-      // Compose reference string
-      const refStr = [
-        editReferenceFields.quotation.checked ? `Quotation#${editReferenceFields.quotation.value}` : null,
-        editReferenceFields.invoice.checked ? `Invoice#${editReferenceFields.invoice.value}` : null,
-        editReferenceFields.qb.checked ? `QB#${editReferenceFields.qb.value}` : null
-      ].filter(Boolean).join(', ');
-      updatePayload.Reference = refStr;
-    }
-    try {
-      const res = await fetch(`/transactions/${activeTab}/${selectedIdx}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatePayload),
-      });
-      if (res.ok) {
-        setMessage('Transaction updated!');
-        setSelectedIdx(null);
-      } else {
-        const data = await res.json();
-        setMessage(data.detail || 'Error updating transaction');
-      }
-    } catch {
-      setMessage('Network error');
-    }
-  };
-
-  // Replace ACTIONS with per-tab actions
-  const actionsList = TAB_ACTIONS[activeTab] || [];
 
   const descriptionRefs = React.useRef<Array<HTMLInputElement | null>>([]);
 
@@ -624,7 +611,12 @@ function App() {
                 );
               })
             )}
-            <button type="submit">Save</button>
+            <div>
+              <label>
+                <input type="checkbox" checked={showDone} onChange={e => setShowDone(e.target.checked)} /> Mark as done
+              </label>
+            </div>
+            <button type="submit">{editIdx !== null ? 'Update' : 'Save'}</button>
           </form>
           {message && <div className="message">{message}</div>}
         </section>
@@ -654,7 +646,7 @@ function App() {
               </thead>
               <tbody>
                 {filteredTxs.map((tx, idx) => (
-                  <tr key={getRealIdx(idx)} className={selectedIdx === getRealIdx(idx) ? 'selected' : ''} onClick={() => handleRowClick(idx)} style={{cursor:'pointer'}}>
+                  <tr key={getRealIdx(idx)} className={editIdx === getRealIdx(idx) ? 'selected' : ''} onClick={() => handleRowClick(idx)} style={{cursor:'pointer'}}>
                     <td>{tx.Name}</td>
                     <td>{tx.Date}</td>
                     {activeTab !== 'received' && <td>{tx.Description}</td>}
@@ -662,7 +654,10 @@ function App() {
                     <td>{tx.Amount}</td>
                     {activeTab === 'purchases' && <td>{tx.VAT}</td>}
                     <td>{tx.Total}</td>
-                    <td>{Array.isArray(tx.Actions) ? tx.Actions.join(', ') : tx.Actions}</td>
+                    <td>
+                      <button type="button" onClick={() => handleEditTransaction(getRealIdx(idx))}>Edit</button>
+                      <button type="button" onClick={() => handleDeleteTransaction(getRealIdx(idx))} style={{marginLeft:4}}>Delete</button>
+                    </td>
                     <td>{tx.Done ? '✔️' : ''}</td>
                   </tr>
                 ))}
@@ -670,111 +665,6 @@ function App() {
             </table>
           )}
         </section>
-        {selectedIdx !== null && (
-          <section className="edit-section">
-            <h2>Edit Transaction</h2>
-            <form onSubmit={e => {
-              e.preventDefault();
-              handleUpdate();
-            }}>
-              <div>
-                <label>Actions:</label>
-                {activeTab === 'sales' ? (
-                  <>
-                    <div>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={editActions.includes('Registered in QB')}
-                          onChange={() => handleEditActionChange('Registered in QB')}
-                        />
-                        Registered in QB
-                      </label>
-                    </div>
-                    <div>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={editActions.includes('Paid')}
-                          onChange={() => handleEditActionChange('Paid')}
-                        />
-                        Paid
-                      </label>
-                      {editActions.includes('Paid') && (
-                        <span style={{marginLeft:8}}>
-                          <label style={{marginRight:8}}>
-                            <input
-                              type="radio"
-                              name="editPaidStatus"
-                              value="partial"
-                              checked={editActions.includes('Paid:partial')}
-                              onChange={() => {
-                                setEditActions(actions => [
-                                  ...actions.filter(a => !a.startsWith('Paid:')),
-                                  'Paid',
-                                  'Paid:partial',
-                                ]);
-                              }}
-                            /> Partially
-                          </label>
-                          <label>
-                            <input
-                              type="radio"
-                              name="editPaidStatus"
-                              value="full"
-                              checked={editActions.includes('Paid:full')}
-                              onChange={() => {
-                                setEditActions(actions => [
-                                  ...actions.filter(a => !a.startsWith('Paid:')),
-                                  'Paid',
-                                  'Paid:full',
-                                ]);
-                              }}
-                            /> Full amount
-                          </label>
-                        </span>
-                      )}
-                    </div>
-                    {/* References UI for edit panel */}
-                    <div style={{marginTop:16}}>
-                      <label>References:</label>
-                      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                        <label><input type="checkbox" checked={editReferenceFields.quotation.checked} onChange={e => handleEditReferenceChange('quotation', e.target.checked)} /> Formal Quotation # <input type="number" style={{width:70}} value={editReferenceFields.quotation.value} onChange={e => handleEditReferenceChange('quotation', true, e.target.value)} disabled={!editReferenceFields.quotation.checked} /></label>
-                        <label><input type="checkbox" checked={editReferenceFields.invoice.checked} onChange={e => handleEditReferenceChange('invoice', e.target.checked)} /> Formal Invoice # <input type="number" style={{width:70}} value={editReferenceFields.invoice.value} onChange={e => handleEditReferenceChange('invoice', true, e.target.value)} disabled={!editReferenceFields.invoice.checked} /></label>
-                        <label><input type="checkbox" checked={editReferenceFields.qb.checked} onChange={e => handleEditReferenceChange('qb', e.target.checked)} /> QB # <input type="number" style={{width:70}} value={editReferenceFields.qb.value} onChange={e => handleEditReferenceChange('qb', true, e.target.value)} disabled={!editReferenceFields.qb.checked} /></label>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  actionsList.map(action => (
-                    <div key={action}>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={editActions.includes(action)}
-                          onChange={() => handleEditActionChange(action)}
-                        />
-                        {action}
-                      </label>
-                    </div>
-                  ))
-                )}
-              </div>
-              <div>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={editDone}
-                    onChange={handleEditDoneChange}
-                  />
-                  Mark as done
-                </label>
-              </div>
-              <button type="submit">Update</button>
-              <button type="button" onClick={() => setSelectedIdx(null)}>Cancel</button>
-            </form>
-          </section>
-        )}
       </div>
     </div>
   );
