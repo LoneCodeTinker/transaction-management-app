@@ -439,12 +439,16 @@ function App() {
 
   const descriptionRefs = React.useRef<Array<HTMLInputElement | null>>([]);
 
-  // Add useEffect to focus the last description input when salesItems changes:
+  // Add useEffect to focus the last description input when salesItems changes or when editing a transaction
   React.useEffect(() => {
-    if (descriptionRefs.current[salesItems.length - 1]) {
+    if (editIdx !== null && salesItems.length === 1) {
+      // Focus the first (and only) description field when editing a single-item transaction
+      descriptionRefs.current[0]?.focus();
+    } else if (salesItems.length > 1) {
+      // Focus the last description field when adding or editing multi-item transactions
       descriptionRefs.current[salesItems.length - 1]?.focus();
     }
-  }, [salesItems.length]);
+  }, [salesItems.length, editIdx]);
 
   return (
     <div className="container">
