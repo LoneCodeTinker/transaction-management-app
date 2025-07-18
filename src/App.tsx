@@ -191,10 +191,11 @@ function App() {
     setFilter(f => ({ ...f, datePreset: 'thismonth' }));
   }, []);
 
-  // Helper to get date boundaries (fix: use local date string for comparison)
+  // Helper to get date boundaries (fix: use UTC for all date math, but compare to tx.Date as string)
   function getDateRange(preset: string) {
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // Always use UTC for date math, but compare to tx.Date as string (assumed local date in yyyy-mm-dd)
+    const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
     let start: Date | null = null, end: Date | null = null;
     switch (preset) {
       case 'today':
@@ -203,37 +204,37 @@ function App() {
         break;
       case 'yesterday':
         start = new Date(today);
-        start.setDate(today.getDate() - 1);
+        start.setUTCDate(today.getUTCDate() - 1);
         end = new Date(start);
         break;
       case 'thisweek': {
-        const day = today.getDay() || 7;
+        const day = today.getUTCDay() || 7;
         start = new Date(today);
-        start.setDate(today.getDate() - day + 1);
+        start.setUTCDate(today.getUTCDate() - day + 1);
         end = new Date(today);
         break;
       }
       case 'lastweek': {
-        const day = today.getDay() || 7;
+        const day = today.getUTCDay() || 7;
         end = new Date(today);
-        end.setDate(today.getDate() - day);
+        end.setUTCDate(today.getUTCDate() - day);
         start = new Date(end);
-        start.setDate(end.getDate() - 6);
+        start.setUTCDate(end.getUTCDate() - 6);
         break;
       }
       case 'thismonth':
-        start = new Date(today.getFullYear(), today.getMonth(), 1);
+        start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
         end = new Date(today);
         break;
       case 'lastmonth': {
-        const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        const last = new Date(today.getFullYear(), today.getMonth(), 0);
+        const first = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
+        const last = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 0));
         start = new Date(first);
         end = new Date(last);
         break;
       }
       case 'thisyear':
-        start = new Date(today.getFullYear(), 0, 1);
+        start = new Date(Date.UTC(today.getUTCFullYear(), 0, 1));
         end = new Date(today);
         break;
       default:
@@ -252,7 +253,7 @@ function App() {
     if (filter.minAmount && Number(tx.Amount) < Number(filter.minAmount)) return false;
     // Max amount
     if (filter.maxAmount && Number(tx.Amount) > Number(filter.maxAmount)) return false;
-    // Date filtering (fix: compare yyyy-mm-dd strings for today/yesterday)
+    // Date filtering (fix: compare to local yyyy-mm-dd, but use UTC for preset math)
     const txDateStr = tx.Date ? tx.Date.slice(0, 10) : '';
     if (filter.datePreset && filter.datePreset !== 'all') {
       if (filter.datePreset === 'custom') {
@@ -264,6 +265,7 @@ function App() {
       } else {
         const { start, end } = getDateRange(filter.datePreset);
         if (start && end && txDateStr) {
+          // Convert UTC date to yyyy-mm-dd for comparison
           const startStr = start.toISOString().slice(0, 10);
           const endStr = end.toISOString().slice(0, 10);
           if (txDateStr < startStr || txDateStr > endStr) return false;
