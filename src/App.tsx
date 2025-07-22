@@ -115,10 +115,17 @@ function App() {
     setShowDone(false);
   }, [activeTab, showDone]); // add showDone to dependencies
 
+  // Map filtered index to real index in transactions (fix: use a unique id for each transaction)
+  // We'll add a _rowIdx property to each transaction when loading from backend
+  useEffect(() => {
+    setTransactions(ts => ts.map((tx, idx) => ({ ...tx, _rowIdx: idx })));
+  }, [transactions.length]);
+
   // When a transaction is selected for editing, initialize form values:
-  const handleEditTransaction = (idx: number) => {
-    const tx = transactions[idx];
-    setEditIdx(idx);
+  const handleEditTransaction = (rowIdx: number) => {
+    const tx = transactions.find(t => t._rowIdx === rowIdx);
+    if (!tx) return;
+    setEditIdx(rowIdx);
     setForm({
       name: tx.Name || '',
       date: tx.Date || today,
@@ -166,10 +173,10 @@ function App() {
   }
 
   // Add handler to delete transaction
-  const handleDeleteTransaction = async (idx: number) => {
+  const handleDeleteTransaction = async (rowIdx: number) => {
     if (!window.confirm('Are you sure you want to delete this transaction?')) return;
     try {
-      const res = await fetch(`/transactions/${activeTab}/${idx}`, { method: 'DELETE' });
+      const res = await fetch(`/transactions/${activeTab}/${rowIdx}`, { method: 'DELETE' });
       if (res.ok) {
         setMessage('Transaction deleted!');
         setEditIdx(null);
@@ -305,16 +312,6 @@ function App() {
     }
     return true;
   }));
-
-  // Map filtered index to real index in transactions
-  const getRealIdx = (filteredIdx: number) => {
-    if (showDone) return filteredIdx;
-    // Use a unique key (row index in the original array) to avoid reference issues
-    const filtered = transactions
-      .map((tx, idx) => ({ tx, idx }))
-      .filter(({ tx }) => !tx.Done);
-    return filtered[filteredIdx]?.idx ?? filteredIdx;
-  };
 
   // Handle sales items table changes
   const handleSalesItemChange = (idx: number, field: string, value: string | number) => {
@@ -847,8 +844,8 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {filteredTxs.map((tx, idx) => (
-                  <tr key={getRealIdx(idx)}>
+                {filteredTxs.map((tx) => (
+                  <tr key={tx._rowIdx}>
                     <td>{tx.Name}</td>
                     <td>{tx.Date}</td>
                     {activeTab !== 'received' && <td>{tx.Description}</td>}
@@ -857,8 +854,8 @@ function App() {
                     {activeTab === 'purchases' && <td>{tx.VAT}</td>}
                     <td>{tx.Total}</td>
                     <td>
-                      <button type="button" onClick={() => handleEditTransaction(getRealIdx(idx))}>Edit</button>
-                      <button type="button" onClick={() => handleDeleteTransaction(getRealIdx(idx))} style={{marginLeft:4}}>Delete</button>
+                      <button type="button" onClick={() => handleEditTransaction(tx._rowIdx)}>Edit</button>
+                      <button type="button" onClick={() => handleDeleteTransaction(tx._rowIdx)} style={{marginLeft:4}}>Delete</button>
                     </td>
                     <td>{tx.Done ? '✔️' : ''}</td>
                   </tr>
