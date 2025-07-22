@@ -837,10 +837,10 @@ function App() {
                   <th onClick={() => setSort(s => ({ key: 'Total', direction: s.key === 'Total' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
                     Total {sort.key === 'Total' && (sort.direction === 'asc' ? '▲' : '▼')}
                   </th>
+                  <th>Actions</th>
                   <th onClick={() => setSort(s => ({ key: 'Done', direction: s.key === 'Done' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
                     Done {sort.key === 'Done' && (sort.direction === 'asc' ? '▲' : '▼')}
                   </th>
-                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
