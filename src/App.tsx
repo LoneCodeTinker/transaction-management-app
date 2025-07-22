@@ -87,6 +87,8 @@ function App() {
     rangeStart: '', // for date range
     rangeEnd: '',
   });
+  // Sort state for transactions list
+  const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: '', direction: 'asc' });
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -243,8 +245,35 @@ function App() {
     return { start, end };
   }
 
-  // Filtered transactions with filter options (including date presets)
-  const filteredTxs = (showDone ? transactions : transactions.filter(tx => !tx.Done)).filter(tx => {
+  // Helper to sort transactions
+  function sortTransactions(arr: any[]) {
+    if (!sort.key) return arr;
+    return [...arr].sort((a, b) => {
+      let aVal = a[sort.key] ?? '';
+      let bVal = b[sort.key] ?? '';
+      // For Done, convert to 0/1
+      if (sort.key === 'Done') {
+        aVal = aVal ? 1 : 0;
+        bVal = bVal ? 1 : 0;
+      }
+      // For Amount, parse as float
+      if (sort.key === 'Amount') {
+        aVal = parseFloat(aVal) || 0;
+        bVal = parseFloat(bVal) || 0;
+      }
+      // For Date, compare as string (yyyy-mm-dd)
+      if (sort.key === 'Date') {
+        aVal = (aVal || '').slice(0, 10);
+        bVal = (bVal || '').slice(0, 10);
+      }
+      if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+
+  // Compose filtered and sorted transactions
+  const filteredTxs = sortTransactions((showDone ? transactions : transactions.filter(tx => !tx.Done)).filter(tx => {
     // Name filter (case-insensitive substring)
     if (filter.name && !(tx.Name || '').toLowerCase().includes(filter.name.toLowerCase())) return false;
     // Reference filter (case-insensitive substring)
@@ -275,7 +304,7 @@ function App() {
       if (txDateStr !== filter.date) return false;
     }
     return true;
-  });
+  }));
 
   // Map filtered index to real index in transactions
   const getRealIdx = (filteredIdx: number) => {
@@ -778,7 +807,10 @@ function App() {
               <label style={{fontWeight:400}}>Max Amount:</label><br/>
               <input type="number" value={filter.maxAmount} onChange={e => setFilter(f => ({...f, maxAmount: e.target.value}))} placeholder="Max" style={{width:90}} />
             </div>
-            <button type="button" onClick={() => setFilter({name:'',date:'',minAmount:'',maxAmount:'',reference:'',datePreset:'all',customDate:'',rangeStart:'',rangeEnd:''})} style={{height:36}}>Clear</button>
+            <button type="button" onClick={() => {
+              setFilter({name:'',date:'',minAmount:'',maxAmount:'',reference:'',datePreset:'thismonth',customDate:'',rangeStart:'',rangeEnd:''});
+              setSort({ key: '', direction: 'asc' });
+            }} style={{height:36}}>Clear</button>
           </div>
           <label style={{marginBottom:8,display:'block'}}>
             <input type="checkbox" checked={showDone} onChange={e => setShowDone(e.target.checked)} /> Show Done Transactions
@@ -791,15 +823,27 @@ function App() {
             <table className="tx-table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Date</th>
+                  <th onClick={() => setSort(s => ({ key: 'Name', direction: s.key === 'Name' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                    Name {sort.key === 'Name' && (sort.direction === 'asc' ? '▲' : '▼')}
+                  </th>
+                  <th onClick={() => setSort(s => ({ key: 'Date', direction: s.key === 'Date' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                    Date {sort.key === 'Date' && (sort.direction === 'asc' ? '▲' : '▼')}
+                  </th>
                   {activeTab !== 'received' && <th>Description</th>}
-                  {activeTab !== 'received' && <th>Reference</th>}
-                  <th>Amount</th>
+                  {activeTab !== 'received' && <th onClick={() => setSort(s => ({ key: 'Reference', direction: s.key === 'Reference' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                    Reference {sort.key === 'Reference' && (sort.direction === 'asc' ? '▲' : '▼')}
+                  </th>}
+                  <th onClick={() => setSort(s => ({ key: 'Amount', direction: s.key === 'Amount' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                    Amount {sort.key === 'Amount' && (sort.direction === 'asc' ? '▲' : '▼')}
+                  </th>
                   {activeTab === 'purchases' && <th>VAT</th>}
-                  <th>Total</th>
+                  <th onClick={() => setSort(s => ({ key: 'Total', direction: s.key === 'Total' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                    Total {sort.key === 'Total' && (sort.direction === 'asc' ? '▲' : '▼')}
+                  </th>
+                  <th onClick={() => setSort(s => ({ key: 'Done', direction: s.key === 'Done' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                    Done {sort.key === 'Done' && (sort.direction === 'asc' ? '▲' : '▼')}
+                  </th>
                   <th>Actions</th>
-                  <th>Done</th>
                 </tr>
               </thead>
               <tbody>
