@@ -97,7 +97,8 @@ function App() {
         const res = await fetch(`/transactions/${activeTab}`); // Use relative path for proxy
         if (res.ok) {
           const data = await res.json();
-          setTransactions(data);
+          // Assign a stable _rowIdx to each transaction from backend
+          setTransactions(data.map((tx: any, idx: number) => ({ ...tx, _rowIdx: idx })));
         } else {
           setTransactions([]);
         }
@@ -114,12 +115,6 @@ function App() {
     setEditIdx(null);
     setShowDone(false);
   }, [activeTab, showDone]); // add showDone to dependencies
-
-  // Map filtered index to real index in transactions (fix: use a unique id for each transaction)
-  // We'll add a _rowIdx property to each transaction when loading from backend
-  useEffect(() => {
-    setTransactions(ts => ts.map((tx, idx) => ({ ...tx, _rowIdx: idx })));
-  }, [transactions.length]);
 
   // When a transaction is selected for editing, initialize form values:
   const handleEditTransaction = (rowIdx: number) => {
