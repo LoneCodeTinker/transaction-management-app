@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
+import editIcon from './assets/edit-icon.svg';
+import delIcon from './assets/del-icon3.svg';
 
 const TABS = [
   { key: 'sales', label: 'Sales', entity: 'Customer' },
@@ -587,7 +589,7 @@ function App() {
 
   return (
     <div className="container">
-      <h1>Transaction Management</h1>
+      <h1>MC Transactions</h1>
       <div className="tabs">
         {TABS.map(tab => (
           <button
@@ -878,8 +880,12 @@ function App() {
                       {activeTab === 'purchases' && <td>{tx.VAT}</td>}
                       <td>{tx.Total}</td>
                       <td>
-                        <button type="button" onClick={e => { e.stopPropagation(); handleEditTransaction(tx._rowIdx); }}>Edit</button>
-                        <button type="button" onClick={e => { e.stopPropagation(); handleDeleteTransaction(tx._rowIdx); }} style={{marginLeft:4}}>Delete</button>
+                        <button type="button" onClick={e => { e.stopPropagation(); handleEditTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,cursor:'pointer'}} title="Edit">
+                          <img src={editIcon} alt="Edit" style={{width:22,height:22,verticalAlign:'middle'}} />
+                        </button>
+                        <button type="button" onClick={e => { e.stopPropagation(); handleDeleteTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,marginLeft:8,cursor:'pointer'}} title="Delete">
+                          <img src={delIcon} alt="Delete" style={{width:22,height:22,verticalAlign:'middle'}} />
+                        </button>
                       </td>
                       <td>{tx.Done ? '✔️' : ''}</td>
                     </tr>

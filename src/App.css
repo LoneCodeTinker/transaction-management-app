@@ -166,6 +166,16 @@ input[type="radio"]:checked {
   padding: 0.5rem 0.75rem;
   text-align: left;
   color: #222;
+  vertical-align: middle;
+}
+.tx-table td:last-child {
+  text-align: center;
+}
+.tx-table td > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 2px;
 }
 .tx-table th {
   background: #f0f0f0;
