@@ -90,6 +90,7 @@ function App() {
   });
   // Sort state for transactions list
   const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: '', direction: 'asc' });
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set()); // Track expanded sales rows
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -168,6 +169,15 @@ function App() {
       // fallback: just description
       return { description: itemStr.trim(), quantity: 1, price: 0, total: 0, vat: 0 };
     });
+  }
+
+  // Helper to summarize sales description for table
+  function salesSummary(tx: any) {
+    if (!tx.Description) return '';
+    const items = parseSalesDescription(tx.Description);
+    const itemCount = items.length;
+    const isTax = !!tx.VAT && tx.VAT > 0;
+    return `${itemCount} item${itemCount > 1 ? 's' : ''}, ${isTax ? 'Tax' : 'Non-tax'} client`;
   }
 
   // Add handler to delete transaction
@@ -816,7 +826,7 @@ function App() {
             <div>No transactions found.</div>
           ) : (
             <table className="tx-table">
-              <thead>
+              <thead style={{position:'sticky',top:0,zIndex:2,background:'#fff'}}>
                 <tr>
                   <th onClick={() => setSort(s => ({ key: 'Name', direction: s.key === 'Name' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
                     Name {sort.key === 'Name' && (sort.direction === 'asc' ? '▲' : '▼')}
@@ -824,13 +834,14 @@ function App() {
                   <th onClick={() => setSort(s => ({ key: 'Date', direction: s.key === 'Date' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
                     Date {sort.key === 'Date' && (sort.direction === 'asc' ? '▲' : '▼')}
                   </th>
-                  {activeTab !== 'received' && <th>Description</th>}
+                  {activeTab === 'sales' && <th>Description</th>}
                   {activeTab !== 'received' && <th onClick={() => setSort(s => ({ key: 'Reference', direction: s.key === 'Reference' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
                     Reference {sort.key === 'Reference' && (sort.direction === 'asc' ? '▲' : '▼')}
                   </th>}
-                  <th onClick={() => setSort(s => ({ key: 'Amount', direction: s.key === 'Amount' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                  {/* Remove Amount column for sales */}
+                  {activeTab !== 'sales' && <th onClick={() => setSort(s => ({ key: 'Amount', direction: s.key === 'Amount' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
                     Amount {sort.key === 'Amount' && (sort.direction === 'asc' ? '▲' : '▼')}
-                  </th>
+                  </th>}
                   {activeTab === 'purchases' && <th>VAT</th>}
                   <th onClick={() => setSort(s => ({ key: 'Total', direction: s.key === 'Total' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
                     Total {sort.key === 'Total' && (sort.direction === 'asc' ? '▲' : '▼')}
@@ -843,26 +854,64 @@ function App() {
               </thead>
               <tbody>
                 {filteredTxs.map((tx) => (
-                  <tr key={tx._rowIdx}>
-                    <td>{tx.Name}</td>
-                    <td>{tx.Date}</td>
-                    {activeTab !== 'received' && <td>{tx.Description}</td>}
-                    {activeTab !== 'received' && <td>{tx.Reference}</td>}
-                    <td>{tx.Amount}</td>
-                    {activeTab === 'purchases' && <td>{tx.VAT}</td>}
-                    <td>{tx.Total}</td>
-                    <td>
-                      <button type="button" onClick={() => handleEditTransaction(tx._rowIdx)}>Edit</button>
-                      <button type="button" onClick={() => handleDeleteTransaction(tx._rowIdx)} style={{marginLeft:4}}>Delete</button>
-                    </td>
-                    <td>{tx.Done ? '✔️' : ''}</td>
-                  </tr>
+                  <React.Fragment key={tx._rowIdx}>
+                    <tr
+                      className={activeTab === 'sales' ? 'expandable-row' : ''}
+                      style={activeTab === 'sales' ? {cursor:'pointer'} : {}}
+                      onClick={activeTab === 'sales' ? (e) => {
+                        // Only expand if not clicking on a button
+                        if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+                        setExpandedRows(rows => {
+                          const newRows = new Set(rows);
+                          if (newRows.has(tx._rowIdx)) newRows.delete(tx._rowIdx);
+                          else newRows.add(tx._rowIdx);
+                          return newRows;
+                        });
+                      } : undefined}
+                    >
+                      <td>{tx.Name}</td>
+                      <td>{tx.Date}</td>
+                      {activeTab === 'sales' && <td>{salesSummary(tx)}</td>}
+                      {activeTab !== 'received' && <td>{tx.Reference}</td>}
+                      {/* Remove Amount column for sales */}
+                      {activeTab !== 'sales' && <td>{tx.Amount}</td>}
+                      {activeTab === 'purchases' && <td>{tx.VAT}</td>}
+                      <td>{tx.Total}</td>
+                      <td>
+                        <button type="button" onClick={e => { e.stopPropagation(); handleEditTransaction(tx._rowIdx); }}>Edit</button>
+                        <button type="button" onClick={e => { e.stopPropagation(); handleDeleteTransaction(tx._rowIdx); }} style={{marginLeft:4}}>Delete</button>
+                      </td>
+                      <td>{tx.Done ? '✔️' : ''}</td>
+                    </tr>
+                    {/* Expandable details row for sales */}
+                    {activeTab === 'sales' && expandedRows.has(tx._rowIdx) && (
+                      <tr className="expanded-row-details">
+                        <td colSpan={8} style={{background:'#f9f9f9',padding:'8px 16px'}}>
+                          <strong>Items:</strong>
+                          <ul style={{margin:'8px 0 0 0',padding:'0 0 0 16px'}}>
+                            {parseSalesDescription(tx.Description).map((item, idx) => (
+                              <li key={idx}>{item.description} | Qty: {item.quantity} | Price: {item.price} | Total: {item.total} | VAT: {item.vat}</li>
+                            ))}
+                          </ul>
+                          <div style={{marginTop:8}}><strong>VAT:</strong> {tx.VAT > 0 ? 'Tax client' : 'Non-tax client'}</div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
           )}
         </section>
       </div>
+      {/* Scroll-to-top button */}
+      <button
+        style={{position:'fixed',bottom:24,right:24,zIndex:10,background:'#1976d2',color:'#fff',border:'none',borderRadius:24,width:48,height:48,boxShadow:'0 2px 8px #0002',fontSize:28,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}
+        onClick={() => window.scrollTo({top:0,behavior:'smooth'})}
+        aria-label="Scroll to top"
+      >
+        ↑
+      </button>
     </div>
   );
 }

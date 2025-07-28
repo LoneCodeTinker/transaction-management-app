@@ -177,6 +177,21 @@ input[type="radio"]:checked {
 .tx-table tr.selected {
   background: #e6f7ff !important;
 }
+.tx-table thead th {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 2;
+}
+
+.expandable-row:hover {
+  background: #f0f6ff;
+}
+.expanded-row-details td {
+  border-top: none !important;
+  background: #f9f9f9;
+  font-size: 0.98em;
+}
 
 .edit-panel {
   margin-top: 1.5rem;
@@ -197,4 +212,24 @@ input[type="radio"]:checked {
   margin-top: 1rem;
   color: #0078d4;
   font-weight: 500;
+}
+
+/* Scroll-to-top button styles (already inline, but add fallback) */
+.scroll-to-top-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 10;
+  background: #1976d2;
+  color: #fff;
+  border: none;
+  border-radius: 24px;
+  width: 48px;
+  height: 48px;
+  box-shadow: 0 2px 8px #0002;
+  font-size: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
