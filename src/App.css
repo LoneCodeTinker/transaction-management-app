@@ -155,12 +155,11 @@ input[type="radio"]:checked {
 }
 
 .tx-table {
-  width: 100%;
-  overflow-x: auto;
-  display: block;
   border-collapse: collapse;
-  margin-top: 1rem;
-  background: #fff;
+  width: 100%;
+  table-layout: auto;
+  max-width: 100%;
+  overflow-x: auto;
 }
 .tx-table th, .tx-table td {
   border: 1px solid #ddd;
@@ -177,11 +176,17 @@ input[type="radio"]:checked {
 .tx-table tr.selected {
   background: #e6f7ff !important;
 }
+.tx-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+}
 .tx-table thead th {
   position: sticky;
   top: 0;
+  z-index: 3;
   background: #fff;
-  z-index: 2;
 }
 
 .expandable-row:hover {
