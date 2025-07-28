@@ -69,6 +69,7 @@ function App() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showDone, setShowDone] = useState(false);
+  const [formDone, setFormDone] = useState(false); // Separate form done state
   // Add payment method state for received tab
   const [receivedMethod, setReceivedMethod] = useState<'cash' | 'bank'>('cash');
   // Paid status for sales tab
@@ -111,8 +112,9 @@ function App() {
   }, [activeTab, message]); // refetch on tab or after save
 
   useEffect(() => {
-    // Reset edit index when tab changes or on save
+    // Reset edit index and formDone when tab changes or on save
     setEditIdx(null);
+    setFormDone(false);
     setShowDone(false);
   }, [activeTab, showDone]); // add showDone to dependencies
 
@@ -131,6 +133,7 @@ function App() {
       total: tx.Total?.toString() || '',
       notes: tx.Description || '', // for received
     });
+    setFormDone(!!tx.Done); // Set formDone from transaction
     if (activeTab === 'sales') {
       setSalesItems(parseSalesDescription(tx.Description));
       setSalesVAT(!!tx.VAT);
@@ -389,7 +392,7 @@ function App() {
         total: salesTotalWithVAT,
         actions: actions,
         paidStatus: paidStatus === 'none' ? undefined : paidStatus,
-        done: showDone,
+        done: formDone, // Use formDone for transaction
       };
       if (editIdx !== null) {
         // Update transaction with full payload
@@ -724,7 +727,7 @@ function App() {
             )}
             <div>
               <label>
-                <input type="checkbox" checked={showDone} onChange={e => setShowDone(e.target.checked)} /> Mark as done
+                <input type="checkbox" checked={formDone} onChange={e => setFormDone(e.target.checked)} /> Mark as done
               </label>
             </div>
             <button type="submit">{editIdx !== null ? 'Update' : 'Save'}</button>
