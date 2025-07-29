@@ -592,7 +592,6 @@ function App() {
   return (
     <div className="container">
       <header className="header">
-        {/* Choose logo layout: LogoRct (horizontal) or LogoSqr (stacked) */}
         <img src={LogoRct} alt="MC Transactions Logo" className="header-logo" />
         <h1 className="header-title">MC Transactions</h1>
       </header>
@@ -750,7 +749,7 @@ function App() {
             </div>
             <button type="submit">{editIdx !== null ? 'Update' : 'Save'}</button>
             {editIdx !== null && (
-              <button type="button" onClick={() => {
+              <button type="button" style={{marginLeft:'0.5em'}} onClick={() => {
                 setEditIdx(null);
                 setForm({ name: '', date: today });
                 setSalesItems([{ description: '', quantity: 1, price: 0, total: 0, vat: 0 }]);
@@ -886,10 +885,10 @@ function App() {
                       {activeTab === 'purchases' && <td>{tx.VAT}</td>}
                       <td>{tx.Total}</td>
                       <td style={{ width: 64, minWidth: 64, maxWidth: 64, textAlign: 'center' }}>
-                        <button type="button" onClick={e => { e.stopPropagation(); handleEditTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}} title="Edit">
+                        <button type="button" className="icon-btn" onClick={e => { e.stopPropagation(); handleEditTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}} title="Edit">
                           <img src={editIcon} alt="Edit" style={{width:22,height:22,verticalAlign:'middle'}} />
                         </button>
-                        <button type="button" onClick={e => { e.stopPropagation(); handleDeleteTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,marginLeft:8,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}} title="Delete">
+                        <button type="button" className="icon-btn" onClick={e => { e.stopPropagation(); handleDeleteTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,marginLeft:8,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}} title="Delete">
                           <img src={delIcon} alt="Delete" style={{width:22,height:22,verticalAlign:'middle'}} />
                         </button>
                       </td>
@@ -918,7 +917,7 @@ function App() {
       </div>
       {/* Scroll-to-top button */}
       <button
-        style={{position:'fixed',bottom:24,right:24,zIndex:10,background:'#1976d2',color:'#fff',border:'none',borderRadius:24,width:48,height:48,boxShadow:'0 2px 8px #0002',fontSize:28,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}
+        className="scroll-to-top-btn"
         onClick={() => window.scrollTo({top:0,behavior:'smooth'})}
         aria-label="Scroll to top"
       >
