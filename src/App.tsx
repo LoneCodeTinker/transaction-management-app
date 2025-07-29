@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import editIcon from './assets/edit-icon.svg';
 import delIcon from './assets/del-icon3.svg';
+import LogoSqr from './assets/Logo-sqr.svg';
+import LogoRct from './assets/Logo-rct.svg';
 
 const TABS = [
   { key: 'sales', label: 'Sales', entity: 'Customer' },
@@ -589,7 +591,11 @@ function App() {
 
   return (
     <div className="container">
-      <h1>MC Transactions</h1>
+      <header className="header">
+        {/* Choose logo layout: LogoRct (horizontal) or LogoSqr (stacked) */}
+        <img src={LogoRct} alt="MC Transactions Logo" className="header-logo" />
+        <h1 className="header-title">MC Transactions</h1>
+      </header>
       <div className="tabs">
         {TABS.map(tab => (
           <button

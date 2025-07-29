@@ -6,6 +6,11 @@ html, body {
   color: #222;
 }
 
+:root {
+  --color-primary: #5fa49f;
+  --color-accent: #dab177;
+}
+
 #root {
   max-width: 1280px;
   margin: 0 auto;
@@ -68,15 +73,20 @@ html, body {
   border: none;
   background: #eee;
   color: #222;
+  border-bottom: 2px solid transparent;
   border-radius: 6px 6px 0 0;
   cursor: pointer;
   font-weight: 500;
   font-size: 1rem;
-  transition: background 0.2s;
+  transition: background 0.2s, border-color 0.2s;
 }
 .tabs button.active {
-  background: #0078d4;
+  background: var(--color-primary);
   color: #fff;
+}
+.tabs button:hover:not(.active) {
+  background: #e6f7ff;
+  border-bottom: 2px solid var(--color-primary);
 }
 
 .tab-content {
@@ -107,23 +117,29 @@ input, textarea, button {
   background: #fff;
 }
 input:focus, textarea:focus {
-  outline: 2px solid #0078d4;
+  outline: 2px solid var(--color-primary);
 }
 
-input[type="checkbox"] {
-  accent-color: #0078d4 !important;
+input[type="checkbox"], input[type="radio"] {
+  accent-color: var(--color-primary) !important;
   width: 1.1em !important;
   height: 1.1em !important;
   margin-right: 0.5em !important;
   vertical-align: middle !important;
   display: inline-block !important;
   background: #fff !important;
-  border: 1px solid #0078d4 !important;
+  border: 1px solid var(--color-primary) !important;
 }
 
 input[type="checkbox"]:checked {
-  background: #0078d4 !important;
-  border-color: #0078d4 !important;
+  background: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+}
+
+input[type="checkbox"]:checked:after {
+  /* For custom checkmark color if using appearance: none */
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary) !important;
 }
 
 /* Fix radio button width and appearance */
@@ -185,13 +201,17 @@ input[type="radio"]:checked {
   text-align: center;
 }
 .tx-table th {
-  background: #f0f0f0;
+  background: var(--color-primary);
+  color: #fff;
 }
 .tx-table tr:nth-child(even) {
   background: #fafbfc;
 }
 .tx-table tr.selected {
   background: #e6f7ff !important;
+}
+.tx-table tr.expandable-row:hover {
+  background: #e6f7ff;
 }
 .tx-table thead {
   position: sticky;
@@ -220,7 +240,7 @@ input[type="radio"]:checked {
   margin-top: 1.5rem;
   padding: 1rem;
   background: #f4faff;
-  border: 1px solid #b6e0fe;
+  border: 1px solid var(--color-accent);
   border-radius: 8px;
   color: #222;
 }
@@ -233,7 +253,7 @@ input[type="radio"]:checked {
 
 .message {
   margin-top: 1rem;
-  color: #0078d4;
+  color: var(--color-primary);
   font-weight: 500;
 }
 
@@ -243,7 +263,7 @@ input[type="radio"]:checked {
   bottom: 24px;
   right: 24px;
   z-index: 10;
-  background: #1976d2;
+  background: var(--color-primary);
   color: #fff;
   border: none;
   border-radius: 24px;
@@ -255,4 +275,42 @@ input[type="radio"]:checked {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  margin-bottom: 2rem;
+  justify-content: center;
+}
+.header-logo {
+  height: 48px;
+  width: auto;
+  display: block;
+}
+.header-title {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: 1px;
+  margin: 0;
+}
+
+button, .form-section button, .edit-panel button {
+  background-color: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+button:hover, .form-section button:hover, .edit-panel button:hover,
+button:focus, .form-section button:focus, .edit-panel button:focus {
+  background-color: var(--color-accent);
+  color: #222;
 }
