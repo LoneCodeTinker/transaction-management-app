@@ -313,6 +313,11 @@ button, .form-section button, .edit-panel button {
   display: inline-block;
   vertical-align: middle;
 }
+button:hover:not(.icon-btn), .form-section button:hover, .edit-panel button:hover,
+button:focus:not(.icon-btn), .form-section button:focus, .edit-panel button:focus {
+  background-color: var(--color-accent);
+  color: #222;
+}
 button + button, .form-section button + button, .edit-panel button + button {
   margin-left: 0.5em;
 }
