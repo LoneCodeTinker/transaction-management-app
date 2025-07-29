@@ -168,7 +168,11 @@ input[type="radio"]:checked {
   color: #222;
   vertical-align: middle;
 }
+.tx-table th:last-child,
 .tx-table td:last-child {
+  width: 64px;
+  min-width: 64px;
+  max-width: 64px;
   text-align: center;
 }
 .tx-table td > button {
@@ -176,6 +180,9 @@ input[type="radio"]:checked {
   align-items: center;
   justify-content: center;
   margin: 0 2px;
+}
+.tx-table td:last-child {
+  text-align: center;
 }
 .tx-table th {
   background: #f0f0f0;
