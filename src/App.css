@@ -203,7 +203,23 @@ input[type="radio"]:checked {
 .tx-table th {
   background: var(--color-primary);
   color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
+.tx-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-primary);
+}
+.tx-table tr:hover:not(.expanded-row-details):not(.header) {
+  background: #e6f2ef !important; /* lighter shade of #5fa49f */
+}
+.expandable-row:hover {
+  background: #e6f2ef !important;
+}
+
 .tx-table tr:nth-child(even) {
   background: #fafbfc;
 }
