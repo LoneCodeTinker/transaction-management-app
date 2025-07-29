@@ -848,7 +848,7 @@ function App() {
                   <th onClick={() => setSort(s => ({ key: 'Total', direction: s.key === 'Total' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
                     Total {sort.key === 'Total' && (sort.direction === 'asc' ? '▲' : '▼')}
                   </th>
-                  <th>Actions</th>
+                  <th style={{ width: 64, minWidth: 64, maxWidth: 64, textAlign: 'center' }}>Actions</th>
                   <th onClick={() => setSort(s => ({ key: 'Done', direction: s.key === 'Done' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
                     Done {sort.key === 'Done' && (sort.direction === 'asc' ? '▲' : '▼')}
                   </th>
@@ -879,11 +879,11 @@ function App() {
                       {activeTab !== 'sales' && <td>{tx.Amount}</td>}
                       {activeTab === 'purchases' && <td>{tx.VAT}</td>}
                       <td>{tx.Total}</td>
-                      <td>
-                        <button type="button" onClick={e => { e.stopPropagation(); handleEditTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,cursor:'pointer'}} title="Edit">
+                      <td style={{ width: 64, minWidth: 64, maxWidth: 64, textAlign: 'center' }}>
+                        <button type="button" onClick={e => { e.stopPropagation(); handleEditTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}} title="Edit">
                           <img src={editIcon} alt="Edit" style={{width:22,height:22,verticalAlign:'middle'}} />
                         </button>
-                        <button type="button" onClick={e => { e.stopPropagation(); handleDeleteTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,marginLeft:8,cursor:'pointer'}} title="Delete">
+                        <button type="button" onClick={e => { e.stopPropagation(); handleDeleteTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,marginLeft:8,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}} title="Delete">
                           <img src={delIcon} alt="Delete" style={{width:22,height:22,verticalAlign:'middle'}} />
                         </button>
                       </td>
