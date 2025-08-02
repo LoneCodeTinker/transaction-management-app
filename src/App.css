@@ -201,8 +201,8 @@ input[type="radio"]:checked {
   text-align: center;
 }
 .tx-table th {
-  background: var(--color-primary);
-  color: #fff;
+  background: var(--color-primary) !important;
+  color: #fff !important;
   position: sticky;
   top: 0;
   z-index: 3;
@@ -211,7 +211,7 @@ input[type="radio"]:checked {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: var(--color-primary);
+  background: var(--color-primary) !important;
 }
 .tx-table tr:hover:not(.expanded-row-details):not(.header) {
   background: #e6f2ef !important; /* lighter shade of #5fa49f */
