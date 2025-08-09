@@ -137,7 +137,7 @@ function App() {
       amount: tx.Amount?.toString() || '',
       vat: tx.VAT?.toString() || '',
       total: tx.Total?.toString() || '',
-      notes: tx.Description || '', // for received
+      notes: activeTab === 'received' ? (tx.Description || '') : '',
     });
     setFormDone(!!tx.Done); // Set formDone from transaction
     if (activeTab === 'sales') {
@@ -155,7 +155,7 @@ function App() {
     if (activeTab === 'received') {
       setReceivedMethod(tx.Method || 'cash');
     }
-    setShowDone(!!tx.Done);
+    // Do not change showDone when editing a transaction
   };
 
   // Helper to parse sales description string into items array
@@ -479,8 +479,35 @@ function App() {
         total: parseFloat(form.amount), // required by backend
         method: receivedMethod, // send method to backend
         actions,
-        done: false,
+        done: formDone,
       };
+      if (editIdx !== null) {
+        // Update transaction with full payload
+        try {
+          const res = await fetch(`/transactions/${activeTab}/${editIdx}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (res.ok) {
+            setMessage('Payment updated!');
+            setEditIdx(null);
+            setForm({ name: '', date: today, amount: '', notes: '' });
+            setReceivedMethod('cash');
+            setActions([]);
+            setFormDone(false);
+            // Refetch transactions
+            const res2 = await fetch(`/transactions/${activeTab}`);
+            if (res2.ok) setTransactions(await res2.json());
+          } else {
+            const data = await res.json();
+            setMessage(typeof data.detail === 'string' ? data.detail : 'Error updating payment');
+          }
+        } catch {
+          setMessage('Network error');
+        }
+        return;
+      }
       try {
         const res = await fetch('/transaction', {
           method: 'POST',
@@ -492,6 +519,7 @@ function App() {
           setForm({ name: '', date: today, amount: '', notes: '' });
           setReceivedMethod('cash');
           setActions([]);
+          setFormDone(false);
         } else {
           const data = await res.json();
           setMessage(typeof data.detail === 'string' ? data.detail : 'Error saving payment');
@@ -873,9 +901,11 @@ function App() {
                       Amount {sort.key === 'Amount' && (sort.direction === 'asc' ? '▲' : '▼')}
                     </th>}
                     {activeTab === 'purchases' && <th>VAT</th>}
-                    <th onClick={() => setSort(s => ({ key: 'Total', direction: s.key === 'Total' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                    {activeTab !== 'received' && <th onClick={() => setSort(s => ({ key: 'Total', direction: s.key === 'Total' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
                       Total {sort.key === 'Total' && (sort.direction === 'asc' ? '▲' : '▼')}
-                    </th>
+                    </th>}
+                    {activeTab === 'received' && <th>Notes</th>}
+                    {activeTab === 'received' && <th>Method</th>}
                     <th style={{ width: 64, minWidth: 64, maxWidth: 64, textAlign: 'center' }}>Actions</th>
                     <th onClick={() => setSort(s => ({ key: 'Done', direction: s.key === 'Done' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
                       Done {sort.key === 'Done' && (sort.direction === 'asc' ? '▲' : '▼')}
@@ -906,7 +936,9 @@ function App() {
                         {/* Remove Amount column for sales */}
                         {activeTab !== 'sales' && <td>{tx.Amount}</td>}
                         {activeTab === 'purchases' && <td>{tx.VAT}</td>}
-                        <td>{tx.Total}</td>
+                        {activeTab !== 'received' && <td>{tx.Total}</td>}
+                        {activeTab === 'received' && <td>{tx.Description}</td>}
+                        {activeTab === 'received' && <td>{tx.Method ? (tx.Method.charAt(0).toUpperCase() + tx.Method.slice(1)) : ''}</td>}
                         <td style={{ width: 64, minWidth: 64, maxWidth: 64, textAlign: 'center' }}>
                           <button type="button" className="icon-btn" onClick={e => { e.stopPropagation(); handleEditTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}} title="Edit">
                             <img src={editIcon} alt="Edit" style={{width:22,height:22,verticalAlign:'middle'}} />
