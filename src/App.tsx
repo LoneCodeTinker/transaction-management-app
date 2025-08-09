@@ -3,6 +3,7 @@ import './App.css';
 import editIcon from './assets/edit-icon.svg';
 import delIcon from './assets/del-icon3.svg';
 import LogoRct from './assets/Logo-rct.svg';
+import DoneCheckMark from './assets/DoneCheckMark.svg';
 
 const TABS = [
   { key: 'sales', label: 'Sales', entity: 'Customer' },
@@ -121,8 +122,7 @@ function App() {
     // Reset edit index and formDone when tab changes or on save
     setEditIdx(null);
     setFormDone(false);
-    setShowDone(false);
-  }, [activeTab, showDone]); // add showDone to dependencies
+  }, [activeTab]); // Only depend on activeTab
 
   // When a transaction is selected for editing, initialize form values:
   const handleEditTransaction = (rowIdx: number) => {
@@ -915,7 +915,7 @@ function App() {
                             <img src={delIcon} alt="Delete" style={{width:22,height:22,verticalAlign:'middle'}} />
                           </button>
                         </td>
-                        <td>{tx.Done ? '✔️' : ''}</td>
+                        <td>{tx.Done ? <img src={DoneCheckMark} alt="Done" style={{width:22,height:22,display:'block',margin:'0 auto'}} /> : ''}</td>
                       </tr>
                       {/* Expandable details row for sales */}
                       {activeTab === 'sales' && expandedRows.has(tx._rowIdx) && (
