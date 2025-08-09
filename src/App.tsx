@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import editIcon from './assets/edit-icon.svg';
 import delIcon from './assets/del-icon3.svg';
-import LogoSqr from './assets/Logo-sqr.svg';
 import LogoRct from './assets/Logo-rct.svg';
 
 const TABS = [
@@ -49,6 +48,7 @@ interface ReferenceFields {
   quotation: { checked: boolean; value: string };
   invoice: { checked: boolean; value: string };
   qb: { checked: boolean; value: string };
+  qbEst: { checked: boolean; value: string };
 }
 
 function App() {
@@ -67,6 +67,7 @@ function App() {
     quotation: { checked: false, value: '' },
     invoice: { checked: false, value: '' },
     qb: { checked: false, value: '' },
+    qbEst: { checked: false, value: '' },
   });
   const [actions, setActions] = useState<string[]>([]);
   const [message, setMessage] = useState('');
@@ -147,6 +148,7 @@ function App() {
         quotation: { checked: /Quotation#/i.test(tx.Reference), value: (tx.Reference?.match(/Quotation#(\d+)/i)?.[1] || '') },
         invoice: { checked: /Invoice#/i.test(tx.Reference), value: (tx.Reference?.match(/Invoice#(\d+)/i)?.[1] || '') },
         qb: { checked: /QB#/i.test(tx.Reference), value: (tx.Reference?.match(/QB#(\d+)/i)?.[1] || '') },
+        qbEst: { checked: /QB Est\.#/i.test(tx.Reference), value: (tx.Reference?.match(/QB Est#(\d+)/i)?.[1] || '') },
       };
       setReferenceFields(ref);
     }
@@ -383,7 +385,8 @@ function App() {
     return [
       refs.quotation.checked ? `Quotation#${refs.quotation.value}` : null,
       refs.invoice.checked ? `Invoice#${refs.invoice.value}` : null,
-      refs.qb.checked ? `QB#${refs.qb.value}` : null
+      refs.qb.checked ? `QB#${refs.qb.value}` : null,
+      refs.qbEst.checked ? `QB Est#${refs.qbEst.value}` : null
     ].filter(Boolean).join(', ');
   }
 
@@ -422,7 +425,7 @@ function App() {
             setForm({ name: '', date: today });
             setSalesItems([{ description: '', quantity: 1, price: 0, total: 0, vat: 0 }]);
             setSalesVAT(true);
-            setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' } });
+            setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' }, qbEst: { checked: false, value: '' } });
             setActions([]);
             setPaidStatus('none');
             setShowDone(false);
@@ -449,7 +452,7 @@ function App() {
           setForm({ name: '', date: today });
           setSalesItems([{ description: '', quantity: 1, price: 0, total: 0, vat: 0 }]);
           setSalesVAT(true);
-          setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' } });
+          setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' }, qbEst: { checked: false, value: '' } });
           setActions([]);
           setPaidStatus('none');
         } else {
@@ -590,7 +593,7 @@ function App() {
   }, [salesItems.length, editIdx]);
 
   return (
-    <div className="container">
+    <div className="App">
       <header className="header">
         <img src={LogoRct} alt="MC Transactions Logo" className="header-logo" />
         <h1 className="header-title">MC Transactions</h1>
@@ -622,32 +625,40 @@ function App() {
                 </div>
                 <div style={{marginTop:16}}>
                   <label>Items:</label>
-                  <div style={{overflowX:'auto'}}>
-                    <table className="sales-items-table" style={{minWidth:600}}>
+                  <div style={{overflowX:'auto', maxWidth:'100%'}}>
+                    <table className="sales-items-table" style={{minWidth:900, tableLayout:'fixed'}}>
+                      <colgroup>
+                        <col style={{width:'32%'}} />
+                        <col style={{width:'13%'}} />
+                        <col style={{width:'15%'}} />
+                        <col style={{width:'18%'}} />
+                        <col style={{width:'15%'}} />
+                        <col style={{width:'7%'}} />
+                      </colgroup>
                       <thead>
                         <tr>
-                          <th style={{minWidth:220, width:220}}>Item Description</th>
-                          <th style={{minWidth:100, width:100}}>Quantity</th>
-                          <th style={{minWidth:100, width:100}}>Price</th>
-                          <th style={{minWidth:100, width:100}}>Total</th>
-                          <th style={{minWidth:100, width:100}}>VAT 15%</th>
+                          <th style={{minWidth:180, padding:'8px'}}>Item Description</th>
+                          <th style={{minWidth:80, padding:'8px'}}>Quantity</th>
+                          <th style={{minWidth:90, padding:'8px'}}>Price</th>
+                          <th style={{minWidth:110, padding:'8px'}}>Total</th>
+                          <th style={{minWidth:90, padding:'8px'}}>VAT 15%</th>
                           <th style={{width:40}}></th>
                         </tr>
                       </thead>
                       <tbody>
                         {salesItems.map((item, idx) => (
                           <tr key={idx}>
-                            <td><input
-                              style={{width:'100%'}}
+                            <td style={{padding:'6px'}}><input
+                              style={{width:'100%', minWidth:120, padding:'6px'}}
                               value={item.description}
                               onChange={e => handleSalesItemChange(idx, 'description', e.target.value)}
                               ref={el => { descriptionRefs.current[idx] = el; }}
                             /></td>
-                            <td><input type="number" min="1" value={item.quantity} onChange={e => handleSalesItemChange(idx, 'quantity', e.target.value)} style={{width:'100%'}} /></td>
-                            <td><input type="number" min="0" step="0.01" value={item.price} onChange={e => handleSalesItemChange(idx, 'price', e.target.value)} style={{width:'100%'}} /></td>
-                            <td>{Number(item.total).toFixed(2)}</td>
-                            <td>{Number(item.vat).toFixed(2)}</td>
-                            <td>{salesItems.length > 1 && <button type="button" onClick={() => handleRemoveSalesItem(idx)}>-</button>}</td>
+                            <td style={{padding:'6px'}}><input type="number" min="1" value={item.quantity} onChange={e => handleSalesItemChange(idx, 'quantity', e.target.value)} style={{width:'100%', minWidth:60, padding:'6px'}} /></td>
+                            <td style={{padding:'6px'}}><input type="number" min="0" step="0.01" value={item.price} onChange={e => handleSalesItemChange(idx, 'price', e.target.value)} style={{width:'100%', minWidth:70, padding:'6px'}} /></td>
+                            <td style={{padding:'6px'}}>{Number(item.total).toFixed(2)}</td>
+                            <td style={{padding:'6px'}}>{Number(item.vat).toFixed(2)}</td>
+                            <td style={{padding:'6px'}}>{salesItems.length > 1 && <button type="button" onClick={() => handleRemoveSalesItem(idx)}>-</button>}</td>
                           </tr>
                         ))}
                         <tr>
@@ -669,6 +680,7 @@ function App() {
                     <label><input type="checkbox" checked={referenceFields.quotation.checked} onChange={e => handleReferenceChange('quotation', e.target.checked)} /> Formal Quotation # <input type="number" style={{width:70}} value={referenceFields.quotation.value} onChange={e => handleReferenceChange('quotation', true, e.target.value)} disabled={!referenceFields.quotation.checked} /></label>
                     <label><input type="checkbox" checked={referenceFields.invoice.checked} onChange={e => handleReferenceChange('invoice', e.target.checked)} /> Formal Invoice # <input type="number" style={{width:70}} value={referenceFields.invoice.value} onChange={e => handleReferenceChange('invoice', true, e.target.value)} disabled={!referenceFields.invoice.checked} /></label>
                     <label><input type="checkbox" checked={referenceFields.qb.checked} onChange={e => handleReferenceChange('qb', e.target.checked)} /> QB # <input type="number" style={{width:70}} value={referenceFields.qb.value} onChange={e => handleReferenceChange('qb', true, e.target.value)} disabled={!referenceFields.qb.checked} /></label>
+                    <label><input type="checkbox" checked={referenceFields.qbEst.checked} onChange={e => handleReferenceChange('qbEst', e.target.checked)} /> QB Est. # <input type="number" style={{width:70}} value={referenceFields.qbEst.value} onChange={e => handleReferenceChange('qbEst', true, e.target.value)} disabled={!referenceFields.qbEst.checked} /></label>
                   </div>
                 </div>
                 <div style={{marginTop:16}}>
@@ -754,7 +766,7 @@ function App() {
                 setForm({ name: '', date: today });
                 setSalesItems([{ description: '', quantity: 1, price: 0, total: 0, vat: 0 }]);
                 setSalesVAT(true);
-                setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' } });
+                setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' }, qbEst: { checked: false, value: '' } });
                 setActions([]);
                 setPaidStatus('none');
                 setShowDone(false);
@@ -832,97 +844,109 @@ function App() {
           ) : filteredTxs.length === 0 ? (
             <div>No transactions found.</div>
           ) : (
-            <table className="tx-table">
-              <thead style={{position:'sticky',top:0,zIndex:2,background:'#fff'}}>
-                <tr>
-                  <th onClick={() => setSort(s => ({ key: 'Name', direction: s.key === 'Name' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
-                    Name {sort.key === 'Name' && (sort.direction === 'asc' ? '▲' : '▼')}
-                  </th>
-                  <th onClick={() => setSort(s => ({ key: 'Date', direction: s.key === 'Date' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
-                    Date {sort.key === 'Date' && (sort.direction === 'asc' ? '▲' : '▼')}
-                  </th>
-                  {activeTab === 'sales' && <th>Description</th>}
-                  {activeTab !== 'received' && <th onClick={() => setSort(s => ({ key: 'Reference', direction: s.key === 'Reference' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
-                    Reference {sort.key === 'Reference' && (sort.direction === 'asc' ? '▲' : '▼')}
-                  </th>}
-                  {/* Remove Amount column for sales */}
-                  {activeTab !== 'sales' && <th onClick={() => setSort(s => ({ key: 'Amount', direction: s.key === 'Amount' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
-                    Amount {sort.key === 'Amount' && (sort.direction === 'asc' ? '▲' : '▼')}
-                  </th>}
-                  {activeTab === 'purchases' && <th>VAT</th>}
-                  <th onClick={() => setSort(s => ({ key: 'Total', direction: s.key === 'Total' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
-                    Total {sort.key === 'Total' && (sort.direction === 'asc' ? '▲' : '▼')}
-                  </th>
-                  <th style={{ width: 64, minWidth: 64, maxWidth: 64, textAlign: 'center' }}>Actions</th>
-                  <th onClick={() => setSort(s => ({ key: 'Done', direction: s.key === 'Done' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
-                    Done {sort.key === 'Done' && (sort.direction === 'asc' ? '▲' : '▼')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTxs.map((tx) => (
-                  <React.Fragment key={tx._rowIdx}>
-                    <tr
-                      className={activeTab === 'sales' ? 'expandable-row' : ''}
-                      style={activeTab === 'sales' ? {cursor:'pointer'} : {}}
-                      onClick={activeTab === 'sales' ? (e) => {
-                        // Only expand if not clicking on a button
-                        if ((e.target as HTMLElement).tagName === 'BUTTON') return;
-                        setExpandedRows(rows => {
-                          const newRows = new Set(rows);
-                          if (newRows.has(tx._rowIdx)) newRows.delete(tx._rowIdx);
-                          else newRows.add(tx._rowIdx);
-                          return newRows;
-                        });
-                      } : undefined}
-                    >
-                      <td>{tx.Name}</td>
-                      <td>{tx.Date}</td>
-                      {activeTab === 'sales' && <td>{salesSummary(tx)}</td>}
-                      {activeTab !== 'received' && <td>{tx.Reference}</td>}
-                      {/* Remove Amount column for sales */}
-                      {activeTab !== 'sales' && <td>{tx.Amount}</td>}
-                      {activeTab === 'purchases' && <td>{tx.VAT}</td>}
-                      <td>{tx.Total}</td>
-                      <td style={{ width: 64, minWidth: 64, maxWidth: 64, textAlign: 'center' }}>
-                        <button type="button" className="icon-btn" onClick={e => { e.stopPropagation(); handleEditTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}} title="Edit">
-                          <img src={editIcon} alt="Edit" style={{width:22,height:22,verticalAlign:'middle'}} />
-                        </button>
-                        <button type="button" className="icon-btn" onClick={e => { e.stopPropagation(); handleDeleteTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,marginLeft:8,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}} title="Delete">
-                          <img src={delIcon} alt="Delete" style={{width:22,height:22,verticalAlign:'middle'}} />
-                        </button>
-                      </td>
-                      <td>{tx.Done ? '✔️' : ''}</td>
-                    </tr>
-                    {/* Expandable details row for sales */}
-                    {activeTab === 'sales' && expandedRows.has(tx._rowIdx) && (
-                      <tr className="expanded-row-details">
-                        <td colSpan={8} style={{background:'#f9f9f9',padding:'8px 16px'}}>
-                          <strong>Items:</strong>
-                          <ul style={{margin:'8px 0 0 0',padding:'0 0 0 16px'}}>
-                            {parseSalesDescription(tx.Description).map((item, idx) => (
-                              <li key={idx}>{item.description} | Qty: {item.quantity} | Price: {item.price} | Total: {item.total} | VAT: {item.vat}</li>
-                            ))}
-                          </ul>
-                          <div style={{marginTop:8}}><strong>VAT:</strong> {tx.VAT > 0 ? 'Tax client' : 'Non-tax client'}</div>
+            <>
+              {/* Collapse All button for sales expanded rows */}
+              {activeTab === 'sales' && filteredTxs.length > 0 && (
+                <button
+                  type="button"
+                  style={{marginBottom:8,marginLeft:8,background:'#5fa49f',color:'#fff',border:'none',borderRadius:4,padding:'6px 16px',fontWeight:500,cursor:'pointer'}}
+                  onClick={() => setExpandedRows(new Set())}
+                >
+                  Collapse All
+                </button>
+              )}
+              <table className="tx-table">
+                <thead style={{position:'sticky',top:0,zIndex:2,background:'#fff'}}>
+                  <tr>
+                    <th onClick={() => setSort(s => ({ key: 'Name', direction: s.key === 'Name' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                      Name {sort.key === 'Name' && (sort.direction === 'asc' ? '▲' : '▼')}
+                    </th>
+                    <th onClick={() => setSort(s => ({ key: 'Date', direction: s.key === 'Date' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                      Date {sort.key === 'Date' && (sort.direction === 'asc' ? '▲' : '▼')}
+                    </th>
+                    {activeTab === 'sales' && <th>Description</th>}
+                    {activeTab !== 'received' && <th onClick={() => setSort(s => ({ key: 'Reference', direction: s.key === 'Reference' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                      Reference {sort.key === 'Reference' && (sort.direction === 'asc' ? '▲' : '▼')}
+                    </th>}
+                    {/* Remove Amount column for sales */}
+                    {activeTab !== 'sales' && <th onClick={() => setSort(s => ({ key: 'Amount', direction: s.key === 'Amount' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                      Amount {sort.key === 'Amount' && (sort.direction === 'asc' ? '▲' : '▼')}
+                    </th>}
+                    {activeTab === 'purchases' && <th>VAT</th>}
+                    <th onClick={() => setSort(s => ({ key: 'Total', direction: s.key === 'Total' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                      Total {sort.key === 'Total' && (sort.direction === 'asc' ? '▲' : '▼')}
+                    </th>
+                    <th style={{ width: 64, minWidth: 64, maxWidth: 64, textAlign: 'center' }}>Actions</th>
+                    <th onClick={() => setSort(s => ({ key: 'Done', direction: s.key === 'Done' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                      Done {sort.key === 'Done' && (sort.direction === 'asc' ? '▲' : '▼')}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTxs.map((tx) => (
+                    <React.Fragment key={tx._rowIdx}>
+                      <tr
+                        className={activeTab === 'sales' ? 'expandable-row' : ''}
+                        style={activeTab === 'sales' ? {cursor:'pointer'} : {}}
+                        onClick={activeTab === 'sales' ? (e) => {
+                          // Only expand if not clicking on a button
+                          if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+                          setExpandedRows(rows => {
+                            const newRows = new Set(rows);
+                            if (newRows.has(tx._rowIdx)) newRows.delete(tx._rowIdx);
+                            else newRows.add(tx._rowIdx);
+                            return newRows;
+                          });
+                        } : undefined}
+                      >
+                        <td>{tx.Name}</td>
+                        <td>{tx.Date}</td>
+                        {activeTab === 'sales' && <td>{salesSummary(tx)}</td>}
+                        {activeTab !== 'received' && <td>{tx.Reference}</td>}
+                        {/* Remove Amount column for sales */}
+                        {activeTab !== 'sales' && <td>{tx.Amount}</td>}
+                        {activeTab === 'purchases' && <td>{tx.VAT}</td>}
+                        <td>{tx.Total}</td>
+                        <td style={{ width: 64, minWidth: 64, maxWidth: 64, textAlign: 'center' }}>
+                          <button type="button" className="icon-btn" onClick={e => { e.stopPropagation(); handleEditTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}} title="Edit">
+                            <img src={editIcon} alt="Edit" style={{width:22,height:22,verticalAlign:'middle'}} />
+                          </button>
+                          <button type="button" className="icon-btn" onClick={e => { e.stopPropagation(); handleDeleteTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,marginLeft:8,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}} title="Delete">
+                            <img src={delIcon} alt="Delete" style={{width:22,height:22,verticalAlign:'middle'}} />
+                          </button>
                         </td>
+                        <td>{tx.Done ? '✔️' : ''}</td>
                       </tr>
-                    )}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
+                      {/* Expandable details row for sales */}
+                      {activeTab === 'sales' && expandedRows.has(tx._rowIdx) && (
+                        <tr className="expanded-row-details">
+                          <td colSpan={8} style={{background:'#f9f9f9',padding:'8px 16px'}}>
+                            <strong>Items:</strong>
+                            <ul style={{margin:'8px 0 0 0',padding:'0 0 0 16px'}}>
+                              {parseSalesDescription(tx.Description).map((item, idx) => (
+                                <li key={idx}>{item.description} | Qty: {item.quantity} | Price: {item.price} | Total: {item.total} | VAT: {item.vat}</li>
+                              ))}
+                            </ul>
+                            <div style={{marginTop:8}}><strong>VAT:</strong> {tx.VAT > 0 ? 'Tax client' : 'Non-tax client'}</div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </>
           )}
         </section>
+        {/* Scroll-to-top button */}
+        <button
+          className="scroll-to-top-btn"
+          onClick={() => window.scrollTo({top:0,behavior:'smooth'})}
+          aria-label="Scroll to top"
+        >
+          ↑
+        </button>
       </div>
-      {/* Scroll-to-top button */}
-      <button
-        className="scroll-to-top-btn"
-        onClick={() => window.scrollTo({top:0,behavior:'smooth'})}
-        aria-label="Scroll to top"
-      >
-        ↑
-      </button>
     </div>
   );
 }
