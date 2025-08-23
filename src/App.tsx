@@ -61,8 +61,9 @@ function App() {
   });
   // Sales tab specific state
   const [salesItems, setSalesItems] = useState([
-    { description: '', quantity: 1, price: 0, total: 0, vat: 0 }
+    { description: '', quantity: 1, price: '', total: 0, vat: 0 }
   ]);
+  const [salesDiscount, setSalesDiscount] = useState(0); // Discount for the whole sale
   const [salesVAT, setSalesVAT] = useState(true); // VAT checkbox
   const [referenceFields, setReferenceFields] = useState<ReferenceFields>({
     quotation: { checked: false, value: '' },
@@ -160,20 +161,20 @@ function App() {
 
   // Helper to parse sales description string into items array
   function parseSalesDescription(desc: string) {
-    if (!desc) return [{ description: '', quantity: 1, price: 0, total: 0, vat: 0 }];
+    if (!desc) return [{ description: '', quantity: 1, price: '', total: 0, vat: 0 }];
     return desc.split(';').map(itemStr => {
       const m = itemStr.match(/#\d+:\s*(.*?)\s*\|\s*Qty:\s*(\d+)\s*\|\s*Price:\s*([\d.]+)\s*\|\s*Total:\s*([\d.]+)\s*\|\s*VAT:\s*([\d.]+)/i);
       if (m) {
         return {
           description: m[1].trim(),
           quantity: parseInt(m[2]),
-          price: parseFloat(m[3]),
+          price: m[3],
           total: parseFloat(m[4]),
           vat: parseFloat(m[5]),
         };
       }
       // fallback: just description
-      return { description: itemStr.trim(), quantity: 1, price: 0, total: 0, vat: 0 };
+      return { description: itemStr.trim(), quantity: 1, price: '', total: 0, vat: 0 };
     });
   }
 
@@ -331,18 +332,25 @@ function App() {
   const handleSalesItemChange = (idx: number, field: string, value: string | number) => {
     setSalesItems(items => {
       const newItems = [...items];
-      newItems[idx] = { ...newItems[idx], [field]: value };
-      // Auto-calc total and VAT
+      // Fix price input: allow entering .5 as 0.5
+      let val = value;
+      if (field === 'price' && typeof val === 'string') {
+        if (val.startsWith('.')) val = '0' + val;
+        // Only allow up to 3 decimals
+        val = val.replace(/^(\d*)\.(\d{0,3}).*$/, (_, int, dec) => `${int}.${dec}`);
+      }
+      newItems[idx] = { ...newItems[idx], [field]: val };
+      // Auto-calc total and VAT with proper rounding
       const qty = parseFloat(newItems[idx].quantity as any) || 0;
       const price = parseFloat(newItems[idx].price as any) || 0;
-      newItems[idx].total = qty * price;
+      newItems[idx].total = +(qty * price).toFixed(2);
       newItems[idx].vat = salesVAT ? +(newItems[idx].total * 0.15).toFixed(2) : 0;
       return newItems;
     });
   };
   const handleAddSalesItem = () => {
     setSalesItems(items => {
-      const newItems = [...items, { description: '', quantity: 1, price: 0, total: 0, vat: 0 }];
+      const newItems = [...items, { description: '', quantity: 1, price: '', total: 0, vat: 0 }];
       setTimeout(() => {
         const idx = newItems.length - 1;
         descriptionRefs.current[idx]?.focus();
@@ -372,8 +380,9 @@ function App() {
 
   // Calculate totals for sales
   const salesTotal = salesItems.reduce((sum, item) => sum + (parseFloat(item.total as any) || 0), 0);
-  const salesVATTotal = salesItems.reduce((sum, item) => sum + (parseFloat(item.vat as any) || 0), 0);
-  const salesTotalWithVAT = salesTotal + salesVATTotal;
+  const salesTotalAfterDiscount = +(salesTotal - salesDiscount).toFixed(2);
+  const salesVATTotal = +(salesTotalAfterDiscount * (salesVAT ? 0.15 : 0)).toFixed(2);
+  const salesTotalWithVAT = +(salesTotalAfterDiscount + salesVATTotal).toFixed(2);
 
   // Helper to flatten sales items and references for backend
   function salesDescriptionString(items: typeof salesItems) {
@@ -407,6 +416,7 @@ function App() {
         amount: salesTotal,
         vat: salesVATTotal,
         total: salesTotalWithVAT,
+        discount: salesDiscount,
         actions: actions,
         paidStatus: paidStatus === 'none' ? undefined : paidStatus,
         done: formDone, // Use formDone for transaction
@@ -423,7 +433,8 @@ function App() {
             setMessage('Transaction updated!');
             setEditIdx(null);
             setForm({ name: '', date: today });
-            setSalesItems([{ description: '', quantity: 1, price: 0, total: 0, vat: 0 }]);
+            setSalesItems([{ description: '', quantity: 1, price: '', total: 0, vat: 0 }]);
+            setSalesDiscount(0);
             setSalesVAT(true);
             setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' }, qbEst: { checked: false, value: '' } });
             setActions([]);
@@ -450,7 +461,8 @@ function App() {
         if (res.ok) {
           setMessage('Transaction saved!');
           setForm({ name: '', date: today });
-          setSalesItems([{ description: '', quantity: 1, price: 0, total: 0, vat: 0 }]);
+          setSalesItems([{ description: '', quantity: 1, price: '', total: 0, vat: 0 }]);
+          setSalesDiscount(0);
           setSalesVAT(true);
           setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' }, qbEst: { checked: false, value: '' } });
           setActions([]);
@@ -683,14 +695,14 @@ function App() {
                               ref={el => { descriptionRefs.current[idx] = el; }}
                             /></td>
                             <td style={{padding:'6px'}}><input type="number" min="1" value={item.quantity} onChange={e => handleSalesItemChange(idx, 'quantity', e.target.value)} style={{width:'100%', minWidth:60, padding:'6px'}} /></td>
-                            <td style={{padding:'6px'}}><input type="number" min="0" step="0.01" value={item.price} onChange={e => handleSalesItemChange(idx, 'price', e.target.value)} style={{width:'100%', minWidth:70, padding:'6px'}} /></td>
+                            <td style={{padding:'6px'}}><input type="number" min="0" step="0.001" value={item.price} onChange={e => handleSalesItemChange(idx, 'price', e.target.value)} style={{width:'100%', minWidth:70, padding:'6px'}} /></td>
                             <td style={{padding:'6px'}}>{Number(item.total).toFixed(2)}</td>
                             <td style={{padding:'6px'}}>{Number(item.vat).toFixed(2)}</td>
                             <td style={{padding:'6px'}}>{salesItems.length > 1 && <button type="button" onClick={() => handleRemoveSalesItem(idx)}>-</button>}</td>
                           </tr>
                         ))}
                         <tr>
-                          <td colSpan={5}></td>
+                          <td colSpan={6}></td>
                           <td>
                             <button type="button" onClick={handleAddSalesItem} style={{marginTop:4}}>+</button>
                           </td>
@@ -712,7 +724,11 @@ function App() {
                   </div>
                 </div>
                 <div style={{marginTop:16}}>
-                  <strong>Total: </strong>{salesTotal.toFixed(2)} &nbsp; <strong>VAT: </strong>{salesVATTotal.toFixed(2)} &nbsp; <strong>Total (with VAT): </strong>{salesTotalWithVAT.toFixed(2)}
+                  <div style={{marginTop:8}}>
+                    <label>Discount:</label>
+                    <input type="number" min="0" step="0.01" value={salesDiscount} onChange={e => setSalesDiscount(Number(e.target.value))} style={{width:100,marginLeft:8}} />
+                  </div>
+                  <strong>Total: </strong>{salesTotal.toFixed(2)} &nbsp; <strong>Discount: </strong>{salesDiscount.toFixed(2)} &nbsp; <strong>Total after Discount: </strong>{salesTotalAfterDiscount.toFixed(2)} &nbsp; <strong>VAT: </strong>{salesVATTotal.toFixed(2)} &nbsp; <strong>Total (with VAT): </strong>{salesTotalWithVAT.toFixed(2)}
                 </div>
                 {/* Remove actions UI from add form for sales tab */}
               </>
@@ -792,7 +808,7 @@ function App() {
               <button type="button" style={{marginLeft:'0.5em'}} onClick={() => {
                 setEditIdx(null);
                 setForm({ name: '', date: today });
-                setSalesItems([{ description: '', quantity: 1, price: 0, total: 0, vat: 0 }]);
+                setSalesItems([{ description: '', quantity: 1, price: '', total: 0, vat: 0 }]);
                 setSalesVAT(true);
                 setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' }, qbEst: { checked: false, value: '' } });
                 setActions([]);
