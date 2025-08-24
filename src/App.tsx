@@ -142,7 +142,9 @@ function App() {
     });
     setFormDone(!!tx.Done); // Set formDone from transaction
     if (activeTab === 'sales') {
-      setSalesItems(parseSalesDescription(tx.Description));
+      const items = parseSalesDescription(tx.Description);
+      setSalesItems(items);
+      setSalesDiscount((items as any).discount || 0);
       setSalesVAT(!!tx.VAT);
       // Parse references
       const ref: ReferenceFields = {
@@ -162,7 +164,15 @@ function App() {
   // Helper to parse sales description string into items array
   function parseSalesDescription(desc: string) {
     if (!desc) return [{ description: '', quantity: 1, price: '', total: 0, vat: 0 }];
-    return desc.split(';').map(itemStr => {
+    const parts = desc.split(';').map(s => s.trim());
+    let discount = 0;
+    // Check if last part is Discount
+    if (parts.length && /^Discount:/.test(parts[parts.length-1])) {
+      const m = parts[parts.length-1].match(/^Discount:\s*([\d.]+)/);
+      if (m) discount = parseFloat(m[1]);
+      parts.pop();
+    }
+    const items = parts.map(itemStr => {
       const m = itemStr.match(/#\d+:\s*(.*?)\s*\|\s*Qty:\s*(\d+)\s*\|\s*Price:\s*([\d.]+)\s*\|\s*Total:\s*([\d.]+)\s*\|\s*VAT:\s*([\d.]+)/i);
       if (m) {
         return {
@@ -176,6 +186,9 @@ function App() {
       // fallback: just description
       return { description: itemStr.trim(), quantity: 1, price: '', total: 0, vat: 0 };
     });
+    // Attach discount as a property for external use
+    (items as any).discount = discount;
+    return items;
   }
 
   // Helper to summarize sales description for table
@@ -386,9 +399,11 @@ function App() {
 
   // Helper to flatten sales items and references for backend
   function salesDescriptionString(items: typeof salesItems) {
-    return items.map((item, idx) =>
+    // Compose items string, then append discount as last item
+    const itemsStr = items.map((item, idx) =>
       `#${idx+1}: ${item.description} | Qty: ${item.quantity} | Price: ${item.price} | Total: ${item.total} | VAT: ${item.vat}`
     ).join('; ');
+    return itemsStr + `; Discount: ${salesDiscount}`;
   }
   function salesReferenceString(refs: ReferenceFields) {
     return [
@@ -971,11 +986,21 @@ function App() {
                           <td colSpan={8} style={{background:'#f9f9f9',padding:'8px 16px'}}>
                             <strong>Items:</strong>
                             <ul style={{margin:'8px 0 0 0',padding:'0 0 0 16px'}}>
-                              {parseSalesDescription(tx.Description).map((item, idx) => (
-                                <li key={idx}>{item.description} | Qty: {item.quantity} | Price: {item.price} | Total: {item.total} | VAT: {item.vat}</li>
-                              ))}
+                              {(() => {
+                                const items = parseSalesDescription(tx.Description);
+                                return items.map((item, idx) => (
+                                  <li key={idx}>{item.description} | Qty: {item.quantity} | Price: {item.price} | Total: {item.total} | VAT: {item.vat}</li>
+                                ));
+                              })()}
                             </ul>
                             <div style={{marginTop:8}}><strong>VAT:</strong> {tx.VAT > 0 ? 'Tax client' : 'Non-tax client'}</div>
+                            {(() => {
+                              const items = parseSalesDescription(tx.Description);
+                              const discount = (items as any).discount || 0;
+                              return discount > 0 ? (
+                                <div style={{marginTop:8}}><strong>Discount:</strong> {discount.toFixed(2)}</div>
+                              ) : null;
+                            })()}
                           </td>
                         </tr>
                       )}
