@@ -454,7 +454,7 @@ function App() {
             setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' }, qbEst: { checked: false, value: '' } });
             setActions([]);
             setPaidStatus('none');
-            setShowDone(false);
+            setFormDone(false);
             // Refetch transactions
             const res2 = await fetch(`/transactions/${activeTab}`);
             if (res2.ok) setTransactions(await res2.json());
@@ -482,6 +482,7 @@ function App() {
           setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' }, qbEst: { checked: false, value: '' } });
           setActions([]);
           setPaidStatus('none');
+          setFormDone(false);
         } else {
           const data = await res.json();
           setMessage(data.detail || 'Error saving transaction');
@@ -993,7 +994,7 @@ function App() {
                                 ));
                               })()}
                             </ul>
-                            <div style={{marginTop:8}}><strong>VAT:</strong> {tx.VAT > 0 ? 'Tax client' : 'Non-tax client'}</div>
+                            <div style={{marginTop:8}}><strong>VAT:</strong> {tx.VAT > 0 ? 'Taxed' : 'Not taxed'}</div>
                             {(() => {
                               const items = parseSalesDescription(tx.Description);
                               const discount = (items as any).discount || 0;
