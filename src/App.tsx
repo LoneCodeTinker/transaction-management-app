@@ -309,9 +309,11 @@ function App() {
 
   // Compose filtered and sorted transactions
   const filteredTxs = sortTransactions((showDone ? transactions : transactions.filter(tx => !tx.Done)).filter(tx => {
+  // Robust guard for null/invalid tx
+  if (!tx || typeof tx !== 'object') return false;
   // Name filter (case-insensitive substring)
   if (filter.name && !(tx.Name || '').toLowerCase().includes(filter.name.toLowerCase())) return false;
-  // Reference filter (case-insensitive substring) -- FIXED
+  // Reference filter (case-insensitive substring)
   if (filter.reference && !((tx.Reference ?? '').toLowerCase().includes(filter.reference.toLowerCase()))) return false;
     // Min amount
     if (filter.minAmount && Number(tx.Amount) < Number(filter.minAmount)) return false;
