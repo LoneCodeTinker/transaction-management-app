@@ -1,29 +1,3 @@
-import logging
-from fastapi import Request
-# --- Logging Setup ---
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s %(message)s',
-    handlers=[logging.FileHandler("app.log"), logging.StreamHandler()]
-)
-
-# --- Access Log & IP Log Middleware ---
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    ip = request.client.host
-    logging.info(f"Access from IP: {ip}, Path: {request.url.path}, Method: {request.method}")
-    response = await call_next(request)
-    logging.info(f"Response status: {response.status_code} for {request.url.path} from IP: {ip}")
-    return response
-
-# --- Error Logging ---
-@app.exception_handler(Exception)
-async def log_exceptions(request: Request, exc: Exception):
-    logging.error(f"Error for {request.url.path} from IP: {request.client.host}: {exc}")
-    return JSONResponse(status_code=500, content={"detail": str(exc)})
-# --- Audit Log Helper ---
-def audit_log(event: str, user_ip: str = "unknown", details: str = ""):
-    logging.info(f"AUDIT: {event} | IP: {user_ip} | {details}")
 from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
