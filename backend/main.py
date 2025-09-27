@@ -1,4 +1,30 @@
-from fastapi import FastAPI, HTTPException, Body
+import logging
+from fastapi import Request
+# --- Logging Setup ---
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(message)s',
+    handlers=[logging.FileHandler("app.log"), logging.StreamHandler()]
+)
+
+# --- Access Log & IP Log Middleware ---
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    ip = request.client.host
+    logging.info(f"Access from IP: {ip}, Path: {request.url.path}, Method: {request.method}")
+    response = await call_next(request)
+    logging.info(f"Response status: {response.status_code} for {request.url.path} from IP: {ip}")
+    return response
+
+# --- Error Logging ---
+@app.exception_handler(Exception)
+async def log_exceptions(request: Request, exc: Exception):
+    logging.error(f"Error for {request.url.path} from IP: {request.client.host}: {exc}")
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
+# --- Audit Log Helper ---
+def audit_log(event: str, user_ip: str = "unknown", details: str = ""):
+    logging.info(f"AUDIT: {event} | IP: {user_ip} | {details}")
+from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -9,8 +35,36 @@ from datetime import date, datetime
 from openpyxl.utils.exceptions import InvalidFileException
 from zipfile import BadZipFile
 import shutil
+import logging
+
 
 app = FastAPI()
+
+# --- Logging Setup ---
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(message)s',
+    handlers=[logging.FileHandler("app.log"), logging.StreamHandler()]
+)
+
+# --- Access Log & IP Log Middleware ---
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    ip = request.client.host
+    logging.info(f"Access from IP: {ip}, Path: {request.url.path}, Method: {request.method}")
+    response = await call_next(request)
+    logging.info(f"Response status: {response.status_code} for {request.url.path} from IP: {ip}")
+    return response
+
+# --- Error Logging ---
+@app.exception_handler(Exception)
+async def log_exceptions(request: Request, exc: Exception):
+    logging.error(f"Error for {request.url.path} from IP: {request.client.host}: {exc}")
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+# --- Audit Log Helper ---
+def audit_log(event: str, user_ip: str = "unknown", details: str = ""):
+    logging.info(f"AUDIT: {event} | IP: {user_ip} | {details}")
 
 # Allow frontend (localhost:5173) to access backend
 app.add_middleware(
@@ -93,6 +147,8 @@ def get_or_create_workbook():
 
 
 def save_transaction_to_excel(tx: Transaction):
+    # Audit log for transaction save
+    audit_log("Add Transaction", details=f"Type: {tx.type}, Name: {tx.name}, Date: {tx.date}")
     wb = get_or_create_workbook()
     sheet = wb[SHEET_NAMES[tx.type]]
     if sheet.max_row == 1:
@@ -139,6 +195,8 @@ def read_transactions_from_excel(tx_type: str):
 
 
 def update_transaction_in_excel(tx_type: str, idx: int, updated: dict):
+    # Audit log for transaction update
+    audit_log("Update Transaction", details=f"Type: {tx_type}, Index: {idx}")
     wb = get_or_create_workbook()
     sheet = wb[SHEET_NAMES[tx_type]]
     rows = list(sheet.iter_rows(values_only=False))
@@ -198,6 +256,8 @@ def update_transaction(tx_type: str, idx: int, updated: dict = Body(...)):
 
 @app.delete("/transactions/{tx_type}/{idx}")
 def delete_transaction(tx_type: str, idx: int):
+    # Audit log for transaction delete
+    audit_log("Delete Transaction", details=f"Type: {tx_type}, Index: {idx}")
     if tx_type not in SHEET_NAMES:
         raise HTTPException(status_code=400, detail="Invalid transaction type.")
     wb = get_or_create_workbook()
