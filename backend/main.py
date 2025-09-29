@@ -30,6 +30,17 @@ stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
+# Also attach handlers to uvicorn loggers so uvicorn/fastapi logs appear in console and file
+for name in ('uvicorn', 'uvicorn.error', 'uvicorn.access'):
+    uv_logger = logging.getLogger(name)
+    uv_logger.setLevel(logging.INFO)
+    # Clear existing handlers to avoid duplicate messages
+    if uv_logger.hasHandlers():
+        uv_logger.handlers.clear()
+    uv_logger.addHandler(file_handler)
+    uv_logger.addHandler(stream_handler)
+    uv_logger.propagate = False
+
 # --- Access Log & IP Log Middleware ---
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
