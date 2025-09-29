@@ -15,11 +15,20 @@ import logging
 app = FastAPI()
 
 # --- Logging Setup ---
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s %(message)s',
-    handlers=[logging.FileHandler("app.log"), logging.StreamHandler()]
-)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+# Remove all handlers first to avoid duplicates
+if logger.hasHandlers():
+    logger.handlers.clear()
+# File handler
+file_handler = logging.FileHandler("app.log")
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+# Stream handler (console)
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
 
 # --- Access Log & IP Log Middleware ---
 @app.middleware("http")

@@ -309,38 +309,43 @@ function App() {
 
   // Compose filtered and sorted transactions
   const filteredTxs = sortTransactions((showDone ? transactions : transactions.filter(tx => !tx.Done)).filter(tx => {
-  // Robust guard for null/invalid tx
-  if (!tx || typeof tx !== 'object') return false;
-  // Name filter (case-insensitive substring)
-  if (filter.name && !(tx.Name || '').toLowerCase().includes(filter.name.toLowerCase())) return false;
-  // Reference filter (case-insensitive substring)
-  if (filter.reference && !((tx.Reference ?? '').toLowerCase().includes(filter.reference.toLowerCase()))) return false;
-    // Min amount
-    if (filter.minAmount && Number(tx.Amount) < Number(filter.minAmount)) return false;
-    // Max amount
-    if (filter.maxAmount && Number(tx.Amount) > Number(filter.maxAmount)) return false;
-    // Date filtering (fix: compare to local yyyy-mm-dd, but use UTC for preset math)
-    const txDateStr = tx.Date ? tx.Date.slice(0, 10) : '';
-    if (filter.datePreset && filter.datePreset !== 'all') {
-      if (filter.datePreset === 'custom') {
-        if (filter.customDate && txDateStr !== filter.customDate) return false;
-      } else if (filter.datePreset === 'range') {
-        if (filter.rangeStart && filter.rangeEnd) {
-          if (!txDateStr || txDateStr < filter.rangeStart || txDateStr > filter.rangeEnd) return false;
+    try {
+      // Robust guard for null/invalid tx
+      if (!tx || typeof tx !== 'object') return false;
+      // Name filter (case-insensitive substring)
+      if (filter.name && !(tx.Name || '').toLowerCase().includes(filter.name.toLowerCase())) return false;
+      // Reference filter (case-insensitive substring)
+      if (filter.reference && !(String(tx.Reference ?? '').toLowerCase().includes(filter.reference.toLowerCase()))) return false;
+      // Min amount
+      if (filter.minAmount && Number(tx.Amount) < Number(filter.minAmount)) return false;
+      // Max amount
+      if (filter.maxAmount && Number(tx.Amount) > Number(filter.maxAmount)) return false;
+      // Date filtering (fix: compare to local yyyy-mm-dd, but use UTC for preset math)
+      const txDateStr = tx.Date ? tx.Date.slice(0, 10) : '';
+      if (filter.datePreset && filter.datePreset !== 'all') {
+        if (filter.datePreset === 'custom') {
+          if (filter.customDate && txDateStr !== filter.customDate) return false;
+        } else if (filter.datePreset === 'range') {
+          if (filter.rangeStart && filter.rangeEnd) {
+            if (!txDateStr || txDateStr < filter.rangeStart || txDateStr > filter.rangeEnd) return false;
+          }
+        } else {
+          const { start, end } = getDateRange(filter.datePreset);
+          if (start && end && txDateStr) {
+            // Convert UTC date to yyyy-mm-dd for comparison
+            const startStr = start.toISOString().slice(0, 10);
+            const endStr = end.toISOString().slice(0, 10);
+            if (txDateStr < startStr || txDateStr > endStr) return false;
+          }
         }
-      } else {
-        const { start, end } = getDateRange(filter.datePreset);
-        if (start && end && txDateStr) {
-          // Convert UTC date to yyyy-mm-dd for comparison
-          const startStr = start.toISOString().slice(0, 10);
-          const endStr = end.toISOString().slice(0, 10);
-          if (txDateStr < startStr || txDateStr > endStr) return false;
-        }
+      } else if (filter.date) {
+        if (txDateStr !== filter.date) return false;
       }
-    } else if (filter.date) {
-      if (txDateStr !== filter.date) return false;
+      return true;
+    } catch (err) {
+      console.error('Error in transaction filter:', err, tx);
+      return false;
     }
-    return true;
   }));
 
   // Handle sales items table changes
