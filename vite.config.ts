@@ -5,13 +5,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0', // Allow LAN access
-    port: 5173,
+    port: 5174,
     strictPort: true,
     proxy: {
       // Proxy API requests to FastAPI backend
-      '/transaction': 'http://localhost:8000',
-      '/transactions': 'http://localhost:8000',
+      '/transaction': 'http://localhost:8001',
+      '/transactions': 'http://localhost:8001',
     },
-    allowedHosts: ['mc-nas.ddns.net'],
+    allowedHosts: ['mc.mrmemon.uk', 'localhost'],
   },
 });

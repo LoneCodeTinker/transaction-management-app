@@ -1,18 +1,19 @@
-from fastapi import FastAPI, HTTPException, Body, Request
+from fastapi import FastAPI, HTTPException, Body, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 from typing import List, Optional
-import openpyxl
-import os
 from datetime import date, datetime
-from openpyxl.utils.exceptions import InvalidFileException
-from zipfile import BadZipFile
-import shutil
 import logging
+from sqlalchemy.orm import Session
+
+from .database import engine, SessionLocal, Base, get_db, init_db
+from .models import TransactionDB, TransactionCreate, TransactionUpdate, Transaction
 
 
-app = FastAPI()
+app = FastAPI(title="Orders Tracking API")
+
+# Initialize database
+init_db()
 
 # --- Logging Setup ---
 logger = logging.getLogger()
@@ -60,7 +61,7 @@ async def log_exceptions(request: Request, exc: Exception):
 def audit_log(event: str, user_ip: str = "unknown", details: str = ""):
     logging.info(f"AUDIT: {event} | IP: {user_ip} | {details}")
 
-# Allow frontend (localhost:5173) to access backend
+# Allow frontend to access backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -71,194 +72,125 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-EXCEL_FILE = "transactions.xlsx"
-SHEET_NAMES = {"sales": "Sales", "received": "Received", "purchases": "Purchases", "expenses": "Expenses"}
-
-class Transaction(BaseModel):
-    type: str  # sales, purchases, expenses, received
-    name: str  # vendor or customer
-    date: date
-    description: Optional[str] = None
-    reference: Optional[str] = None
-    amount: float
-    vat: float = 0
-    total: float
-    method: Optional[str] = None  # Only for received
-    actions: Optional[List[str]] = None
-    done: bool = False
+VALID_TRANSACTION_TYPES = {"sales", "received", "purchases", "expenses"}
 
 
-def get_or_create_workbook():
-    # Try to load workbook, handle corruption
-    try:
-        if not os.path.exists(EXCEL_FILE):
-            wb = openpyxl.Workbook()
-            for sheet in SHEET_NAMES.values():
-                wb.create_sheet(sheet)
-            if 'Sheet' in wb.sheetnames:
-                del wb['Sheet']
-            wb.save(EXCEL_FILE)
-        wb = openpyxl.load_workbook(EXCEL_FILE)
-    except (BadZipFile, InvalidFileException):
-        # Corrupted file: backup and recreate
-        backup_name = f"transactions_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        shutil.move(EXCEL_FILE, backup_name)
-        wb = openpyxl.Workbook()
-        for sheet in SHEET_NAMES.values():
-            wb.create_sheet(sheet)
-        if 'Sheet' in wb.sheetnames:
-            del wb['Sheet']
-        wb.save(EXCEL_FILE)
-        wb = openpyxl.load_workbook(EXCEL_FILE)
-    # Ensure all required sheets exist and have correct headers
-    changed = False
-    for key, sheet_name in SHEET_NAMES.items():
-        if sheet_name not in wb.sheetnames:
-            wb.create_sheet(sheet_name)
-            changed = True
-        sheet = wb[sheet_name]
-        # Fix: Always ensure headers are in the first row, and remove any extra header rows
-        if sheet.max_row == 0 or all(cell.value is None for cell in sheet[1]):
-            if key == 'received':
-                sheet.append(["Name", "Date", "Amount", "Notes", "Method", "Actions", "Done"])
-            else:
-                sheet.append(["Name", "Date", "Description", "Reference", "Amount", "VAT", "Total", "Actions", "Done"])
-            changed = True
-        # Remove duplicate header rows (keep only the first row as header)
-        header_values = [cell.value for cell in sheet[1]]
-        rows_to_delete = []
-        for i, row in enumerate(sheet.iter_rows(min_row=2, max_row=sheet.max_row), start=2):
-            if [cell.value for cell in row] == header_values:
-                rows_to_delete.append(i)
-        for i in reversed(rows_to_delete):
-            sheet.delete_rows(i)
-        # Also, if the first row is empty, remove it
-        if all(cell.value is None for cell in sheet[1]):
-            sheet.delete_rows(1)
-    if changed:
-        wb.save(EXCEL_FILE)
-    return wb
-
-
-def save_transaction_to_excel(tx: Transaction):
-    # Audit log for transaction save
-    audit_log("Add Transaction", details=f"Type: {tx.type}, Name: {tx.name}, Date: {tx.date}")
-    wb = get_or_create_workbook()
-    sheet = wb[SHEET_NAMES[tx.type]]
-    if sheet.max_row == 1:
-        if tx.type == 'received':
-            sheet.append([
-                "Name", "Date", "Amount", "Notes", "Method", "Actions", "Done"
-            ])
-        else:
-            sheet.append([
-                "Name", "Date", "Description", "Reference", "Amount", "VAT", "Total", "Actions", "Done"
-            ])
-    # Ensure actions is always a list
-    actions = tx.actions if tx.actions is not None else []
-    if tx.type == 'received':
-        sheet.append([
-            tx.name, tx.date.isoformat(), tx.amount, tx.description, tx.method, ','.join(actions), tx.done
-        ])
-    else:
-        sheet.append([
-            tx.name, tx.date.isoformat(), tx.description, tx.reference, tx.amount, tx.vat, tx.total, ','.join(actions), tx.done
-        ])
-    wb.save(EXCEL_FILE)
-
-
-def read_transactions_from_excel(tx_type: str):
-    wb = get_or_create_workbook()
-    sheet = wb[SHEET_NAMES[tx_type]]
-    rows = list(sheet.iter_rows(values_only=True))
-    if len(rows) < 2:
-        return []
-    headers = rows[0]
-    transactions = []
-    for row in rows[1:]:
-        tx = dict(zip(headers, row))
-        if tx_type == 'received':
-            tx['Actions'] = [a for a in (tx.get('Actions') or '').split(',') if a]
-        else:
-            if tx.get('Actions'):
-                tx['Actions'] = [a for a in tx['Actions'].split(',') if a]
-            else:
-                tx['Actions'] = []
-        transactions.append(tx)
-    return transactions
-
-
-def update_transaction_in_excel(tx_type: str, idx: int, updated: dict):
-    # Audit log for transaction update
-    audit_log("Update Transaction", details=f"Type: {tx_type}, Index: {idx}")
-    wb = get_or_create_workbook()
-    sheet = wb[SHEET_NAMES[tx_type]]
-    rows = list(sheet.iter_rows(values_only=False))
-    if idx + 2 > len(rows):
-        raise HTTPException(status_code=404, detail="Transaction not found.")
-    headers = [cell.value for cell in rows[0]]
-    # Map camelCase keys to Excel header names
-    key_map = {
-        'name': 'Name',
-        'date': 'Date',
-        'description': 'Description',
-        'reference': 'Reference',
-        'amount': 'Amount',
-        'vat': 'VAT',
-        'total': 'Total',
-        'actions': 'Actions',
-        'done': 'Done',
-        'method': 'Method',
-        'notes': 'Notes',
-    }
-    # Build a dict with Excel header keys
-    excel_update = {}
-    for k, v in updated.items():
-        header = key_map.get(k, k)
-        excel_update[header] = v
-    for col, key in enumerate(headers):
-        value = excel_update.get(key, rows[idx+1][col].value)
-        if key == 'Actions' and isinstance(value, list):
-            value = ','.join(value)
-        rows[idx+1][col].value = value
-    wb.save(EXCEL_FILE)
-
+# --- Database API Endpoints ---
 
 @app.post("/transaction")
-def add_transaction(tx: Transaction):
-    if tx.type not in SHEET_NAMES:
+def add_transaction(tx_data: TransactionCreate, db: Session = Depends(get_db)):
+    """Create a new transaction."""
+    if tx_data.type not in VALID_TRANSACTION_TYPES:
         raise HTTPException(status_code=400, detail="Invalid transaction type.")
-    save_transaction_to_excel(tx)
-    return {"message": "Transaction saved."}
+    
+    # Convert actions list to comma-separated string for storage
+    actions_str = ','.join(tx_data.actions) if tx_data.actions else ""
+    
+    # Audit log
+    audit_log("Add Transaction", details=f"Type: {tx_data.type}, Name: {tx_data.name}, Date: {tx_data.date}")
+    
+    # Create and save transaction
+    db_transaction = TransactionDB(
+        type=tx_data.type,
+        name=tx_data.name,
+        date=tx_data.date,
+        description=tx_data.description,
+        reference=tx_data.reference,
+        amount=tx_data.amount,
+        vat=tx_data.vat,
+        total=tx_data.total,
+        method=tx_data.method,
+        notes=tx_data.notes,
+        actions=actions_str,
+        done=tx_data.done
+    )
+    db.add(db_transaction)
+    db.commit()
+    db.refresh(db_transaction)
+    
+    return {"message": "Transaction saved.", "id": db_transaction.id}
 
 
 @app.get("/transactions/{tx_type}")
-def list_transactions(tx_type: str):
-    if tx_type not in SHEET_NAMES:
+def list_transactions(tx_type: str, db: Session = Depends(get_db)):
+    """List all transactions of a specific type."""
+    if tx_type not in VALID_TRANSACTION_TYPES:
         raise HTTPException(status_code=400, detail="Invalid transaction type.")
-    txs = read_transactions_from_excel(tx_type)
-    return JSONResponse(content=txs)
+    
+    transactions = db.query(TransactionDB).filter(TransactionDB.type == tx_type).all()
+    
+    # Convert to response format with field names matching frontend expectations
+    result = []
+    for tx in transactions:
+        tx_dict = {
+            "id": tx.id,
+            "Name": tx.name,
+            "Date": tx.date.isoformat() if isinstance(tx.date, date) else tx.date,
+            "Description": tx.description,
+            "Reference": tx.reference,
+            "Amount": tx.amount,
+            "VAT": tx.vat,
+            "Total": tx.total,
+            "Method": tx.method,
+            "Notes": tx.notes,
+            "Actions": [a for a in (tx.actions or '').split(',') if a],
+            "Done": tx.done
+        }
+        result.append(tx_dict)
+    
+    return JSONResponse(content=result)
 
 
-@app.put("/transactions/{tx_type}/{idx}")
-def update_transaction(tx_type: str, idx: int, updated: dict = Body(...)):
-    if tx_type not in SHEET_NAMES:
+@app.put("/transactions/{tx_type}/{tx_id}")
+def update_transaction(tx_type: str, tx_id: int, updated: dict = Body(...), db: Session = Depends(get_db)):
+    """Update a specific transaction."""
+    if tx_type not in VALID_TRANSACTION_TYPES:
         raise HTTPException(status_code=400, detail="Invalid transaction type.")
-    update_transaction_in_excel(tx_type, idx, updated)
+    
+    # Audit log
+    audit_log("Update Transaction", details=f"Type: {tx_type}, ID: {tx_id}")
+    
+    # Find transaction
+    transaction = db.query(TransactionDB).filter(
+        TransactionDB.id == tx_id,
+        TransactionDB.type == tx_type
+    ).first()
+    
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found.")
+    
+    # Update fields
+    for key, value in updated.items():
+        if key == "actions" and isinstance(value, list):
+            setattr(transaction, key, ','.join(value))
+        elif hasattr(transaction, key):
+            setattr(transaction, key, value)
+    
+    db.commit()
+    db.refresh(transaction)
+    
     return {"message": "Transaction updated."}
 
 
-@app.delete("/transactions/{tx_type}/{idx}")
-def delete_transaction(tx_type: str, idx: int):
-    # Audit log for transaction delete
-    audit_log("Delete Transaction", details=f"Type: {tx_type}, Index: {idx}")
-    if tx_type not in SHEET_NAMES:
+@app.delete("/transactions/{tx_type}/{tx_id}")
+def delete_transaction(tx_type: str, tx_id: int, db: Session = Depends(get_db)):
+    """Delete a specific transaction."""
+    if tx_type not in VALID_TRANSACTION_TYPES:
         raise HTTPException(status_code=400, detail="Invalid transaction type.")
-    wb = get_or_create_workbook()
-    sheet = wb[SHEET_NAMES[tx_type]]
-    rows = list(sheet.iter_rows(values_only=False))
-    if idx + 2 > len(rows):
+    
+    # Audit log
+    audit_log("Delete Transaction", details=f"Type: {tx_type}, ID: {tx_id}")
+    
+    # Find and delete transaction
+    transaction = db.query(TransactionDB).filter(
+        TransactionDB.id == tx_id,
+        TransactionDB.type == tx_type
+    ).first()
+    
+    if not transaction:
         raise HTTPException(status_code=404, detail="Transaction not found.")
-    sheet.delete_rows(idx + 2)
-    wb.save(EXCEL_FILE)
+    
+    db.delete(transaction)
+    db.commit()
+    
     return {"message": "Transaction deleted."}

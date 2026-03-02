@@ -1,5 +1,5 @@
 {
-  "name": "trnsactions-app",
+  "name": "orders-tracking",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "dev:all": "concurrently \"npm run dev\" \"npm run backend\"",
-    "backend": "uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000"
+    "backend": "uvicorn backend.main:app --reload --host 0.0.0.0 --port 8001"
   },
   "dependencies": {
     "react": "^19.1.0",

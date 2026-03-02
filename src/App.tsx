@@ -106,8 +106,7 @@ function App() {
         const res = await fetch(`/transactions/${activeTab}`); // Use relative path for proxy
         if (res.ok) {
           const data = await res.json();
-          // Assign a stable _rowIdx to each transaction from backend
-          setTransactions(data.map((tx: any, idx: number) => ({ ...tx, _rowIdx: idx })));
+          setTransactions(data);
         } else {
           setTransactions([]);
         }
@@ -126,10 +125,10 @@ function App() {
   }, [activeTab]); // Only depend on activeTab
 
   // When a transaction is selected for editing, initialize form values:
-  const handleEditTransaction = (rowIdx: number) => {
-    const tx = transactions.find(t => t._rowIdx === rowIdx);
+  const handleEditTransaction = (txId: number) => {
+    const tx = transactions.find(t => t.id === txId);
     if (!tx) return;
-    setEditIdx(rowIdx);
+    setEditIdx(txId);
     setForm({
       name: tx.Name || '',
       date: tx.Date || today,
@@ -201,10 +200,10 @@ function App() {
   }
 
   // Add handler to delete transaction
-  const handleDeleteTransaction = async (rowIdx: number) => {
+  const handleDeleteTransaction = async (txId: number) => {
     if (!window.confirm('Are you sure you want to delete this transaction?')) return;
     try {
-      const res = await fetch(`/transactions/${activeTab}/${rowIdx}`, { method: 'DELETE' });
+      const res = await fetch(`/transactions/${activeTab}/${txId}`, { method: 'DELETE' });
       if (res.ok) {
         setMessage('Transaction deleted!');
         setEditIdx(null);
@@ -658,8 +657,8 @@ function App() {
   return (
     <div className="App">
       <header className="header">
-        <img src={LogoRct} alt="MC Transactions Logo" className="header-logo" />
-        <h1 className="header-title">MC Transactions</h1>
+        <img src={LogoRct} alt="Orders Tracking Logo" className="header-logo" />
+        <h1 className="header-title">Orders Tracking</h1>
       </header>
       <div className="tabs">
         {TABS.map(tab => (
@@ -953,7 +952,7 @@ function App() {
                 </thead>
                 <tbody>
                   {filteredTxs.map((tx) => (
-                    <React.Fragment key={tx._rowIdx}>
+                    <React.Fragment key={tx.id}>
                       <tr
                         className={activeTab === 'sales' ? 'expandable-row' : ''}
                         style={activeTab === 'sales' ? {cursor:'pointer'} : {}}
@@ -962,8 +961,8 @@ function App() {
                           if ((e.target as HTMLElement).tagName === 'BUTTON') return;
                           setExpandedRows(rows => {
                             const newRows = new Set(rows);
-                            if (newRows.has(tx._rowIdx)) newRows.delete(tx._rowIdx);
-                            else newRows.add(tx._rowIdx);
+                            if (newRows.has(tx.id)) newRows.delete(tx.id);
+                            else newRows.add(tx.id);
                             return newRows;
                           });
                         } : undefined}
@@ -979,17 +978,17 @@ function App() {
                         {activeTab === 'received' && <td>{tx.Description}</td>}
                         {activeTab === 'received' && <td>{tx.Method ? (tx.Method.charAt(0).toUpperCase() + tx.Method.slice(1)) : ''}</td>}
                         <td style={{ width: 64, minWidth: 64, maxWidth: 64, textAlign: 'center' }}>
-                          <button type="button" className="icon-btn" onClick={e => { e.stopPropagation(); handleEditTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}} title="Edit">
+                          <button type="button" className="icon-btn" onClick={e => { e.stopPropagation(); handleEditTransaction(tx.id); }} style={{background:'none',border:'none',padding:0,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}} title="Edit">
                             <img src={editIcon} alt="Edit" style={{width:22,height:22,verticalAlign:'middle'}} />
                           </button>
-                          <button type="button" className="icon-btn" onClick={e => { e.stopPropagation(); handleDeleteTransaction(tx._rowIdx); }} style={{background:'none',border:'none',padding:0,marginLeft:8,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}} title="Delete">
+                          <button type="button" className="icon-btn" onClick={e => { e.stopPropagation(); handleDeleteTransaction(tx.id); }} style={{background:'none',border:'none',padding:0,marginLeft:8,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}} title="Delete">
                             <img src={delIcon} alt="Delete" style={{width:22,height:22,verticalAlign:'middle'}} />
                           </button>
                         </td>
                         <td>{tx.Done ? <img src={DoneCheckMark} alt="Done" style={{width:22,height:22,display:'block',margin:'0 auto'}} /> : ''}</td>
                       </tr>
                       {/* Expandable details row for sales */}
-                      {activeTab === 'sales' && expandedRows.has(tx._rowIdx) && (
+                      {activeTab === 'sales' && expandedRows.has(tx.id) && (
                         <tr className="expanded-row-details">
                           <td colSpan={8} style={{background:'#f9f9f9',padding:'8px 16px'}}>
                             <strong>Items:</strong>
