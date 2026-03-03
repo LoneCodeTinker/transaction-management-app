@@ -1,11 +1,69 @@
 """SQLAlchemy ORM models for the Orders Tracking app."""
 
-from sqlalchemy import Column, Integer, String, Float, Date, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Float, Date, Boolean, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
 from datetime import date as DateType, datetime
 from typing import Optional
 from pydantic import BaseModel
+
+
+class ClientDB(Base):
+    """SQLAlchemy model for clients in the database."""
+    __tablename__ = "clients"
+
+    id = Column(Integer, primary_key=True, index=True)
+    display_name = Column(String, index=True)
+    english_name = Column(String, nullable=True)
+    arabic_name = Column(String, nullable=True)
+    contact_person = Column(String, nullable=True)
+    mobile_number = Column(String, nullable=True)
+    file_path = Column(String, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    orders = relationship("OrderDB", back_populates="client", cascade="all, delete-orphan")
+
+
+class OrderDB(Base):
+    """SQLAlchemy model for orders in the database."""
+    __tablename__ = "orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), index=True)
+    project_name = Column(String, nullable=True)
+    file_path = Column(String, nullable=True)
+    date = Column(Date)
+    placed_by = Column(String, nullable=True)
+    mobile_number = Column(String, nullable=True)
+    order_total = Column(Float, default=0)
+    discount = Column(Float, default=0)
+    total_after_discount = Column(Float, default=0)
+    vat_total = Column(Float, default=0)
+    total_with_vat = Column(Float, default=0)
+    status = Column(String, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    client = relationship("ClientDB", back_populates="orders")
+    items = relationship("ItemDB", back_populates="order", cascade="all, delete-orphan")
+
+
+class ItemDB(Base):
+    """SQLAlchemy model for order items in the database."""
+    __tablename__ = "items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    description = Column(String)
+    quantity = Column(Float, default=1)
+    price = Column(Float, default=0)
+    total = Column(Float, default=0)
+    per_item_discount = Column(Float, default=0)
+    vat = Column(Float, default=0)
+
+    order = relationship("OrderDB", back_populates="items")
 
 
 class TransactionDB(Base):
@@ -30,6 +88,117 @@ class TransactionDB(Base):
 
 
 # Pydantic models for API requests/responses
+
+# Client models
+class ClientCreate(BaseModel):
+    display_name: str
+    english_name: Optional[str] = None
+    arabic_name: Optional[str] = None
+    contact_person: Optional[str] = None
+    mobile_number: Optional[str] = None
+    file_path: Optional[str] = None
+
+
+class ClientUpdate(BaseModel):
+    display_name: Optional[str] = None
+    english_name: Optional[str] = None
+    arabic_name: Optional[str] = None
+    contact_person: Optional[str] = None
+    mobile_number: Optional[str] = None
+    file_path: Optional[str] = None
+
+
+class Client(BaseModel):
+    id: int
+    display_name: str
+    english_name: Optional[str]
+    arabic_name: Optional[str]
+    contact_person: Optional[str]
+    mobile_number: Optional[str]
+    file_path: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Item models
+class ItemCreate(BaseModel):
+    description: str
+    quantity: float = 1
+    price: float = 0
+    per_item_discount: float = 0
+    vat: float = 0
+
+
+class ItemUpdate(BaseModel):
+    description: Optional[str] = None
+    quantity: Optional[float] = None
+    price: Optional[float] = None
+    per_item_discount: Optional[float] = None
+    vat: Optional[float] = None
+
+
+class Item(BaseModel):
+    id: int
+    order_id: int
+    description: str
+    quantity: float
+    price: float
+    total: float
+    per_item_discount: float
+    vat: float
+
+    class Config:
+        from_attributes = True
+
+
+# Order models
+class OrderCreate(BaseModel):
+    client_id: int
+    project_name: Optional[str] = None
+    file_path: Optional[str] = None
+    date: DateType
+    placed_by: Optional[str] = None
+    mobile_number: Optional[str] = None
+    discount: float = 0
+    status: Optional[str] = None
+    items: list[ItemCreate] = []
+
+
+class OrderUpdate(BaseModel):
+    project_name: Optional[str] = None
+    file_path: Optional[str] = None
+    date: Optional[DateType] = None
+    placed_by: Optional[str] = None
+    mobile_number: Optional[str] = None
+    discount: Optional[float] = None
+    status: Optional[str] = None
+
+
+class Order(BaseModel):
+    id: int
+    client_id: int
+    project_name: Optional[str]
+    file_path: Optional[str]
+    date: DateType
+    placed_by: Optional[str]
+    mobile_number: Optional[str]
+    order_total: float
+    discount: float
+    total_after_discount: float
+    vat_total: float
+    total_with_vat: float
+    status: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    items: list[Item] = []
+
+    class Config:
+        from_attributes = True
+
+
 class TransactionCreate(BaseModel):
     type: str
     name: str

@@ -7,7 +7,12 @@ import logging
 from sqlalchemy.orm import Session
 
 from .database import engine, SessionLocal, Base, get_db, init_db
-from .models import TransactionDB, TransactionCreate, TransactionUpdate, Transaction
+from .models import (
+    TransactionDB, TransactionCreate, TransactionUpdate, Transaction,
+    ClientDB, ClientCreate, ClientUpdate, Client,
+    OrderDB, OrderCreate, OrderUpdate, Order,
+    ItemDB, ItemCreate, Item
+)
 
 
 app = FastAPI(title="Orders Tracking API")
@@ -73,6 +78,273 @@ app.add_middleware(
 )
 
 VALID_TRANSACTION_TYPES = {"sales", "received", "purchases", "expenses"}
+
+
+# --- Order Calculation Helper Functions ---
+def calculate_item_total(quantity: float, price: float) -> float:
+    """Calculate item total = quantity × price."""
+    return quantity * price
+
+
+def calculate_order_totals(order: OrderDB) -> None:
+    """Calculate and update order totals based on items."""
+    # Calculate item totals
+    order_total = 0
+    total_item_discounts = 0
+    vat_total = 0
+
+    for item in order.items:
+        item.total = calculate_item_total(item.quantity, item.price)
+        order_total += item.total
+        total_item_discounts += item.per_item_discount
+        vat_total += item.vat
+
+    order.order_total = order_total
+    order.total_after_discount = order_total - order.discount - total_item_discounts
+    order.vat_total = vat_total
+    order.total_with_vat = order.total_after_discount + vat_total
+
+
+# --- Client Endpoints ---
+
+@app.post("/clients")
+def create_client(client_data: ClientCreate, db: Session = Depends(get_db)):
+    """Create a new client."""
+    audit_log("Create Client", details=f"Name: {client_data.display_name}")
+
+    db_client = ClientDB(**client_data.dict())
+    db.add(db_client)
+    db.commit()
+    db.refresh(db_client)
+
+    return {"message": "Client created.", "id": db_client.id}
+
+
+@app.get("/clients")
+def list_clients(db: Session = Depends(get_db)):
+    """List all clients."""
+    clients = db.query(ClientDB).all()
+    return clients
+
+
+@app.get("/clients/{client_id}")
+def get_client(client_id: int, db: Session = Depends(get_db)):
+    """Get a specific client."""
+    client = db.query(ClientDB).filter(ClientDB.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found.")
+    return client
+
+
+@app.put("/clients/{client_id}")
+def update_client(client_id: int, client_data: ClientUpdate, db: Session = Depends(get_db)):
+    """Update a specific client."""
+    audit_log("Update Client", details=f"ID: {client_id}")
+
+    client = db.query(ClientDB).filter(ClientDB.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found.")
+
+    for key, value in client_data.dict(exclude_unset=True).items():
+        setattr(client, key, value)
+
+    db.commit()
+    db.refresh(client)
+
+    return {"message": "Client updated."}
+
+
+@app.delete("/clients/{client_id}")
+def delete_client(client_id: int, db: Session = Depends(get_db)):
+    """Delete a specific client (cascades to orders and items)."""
+    audit_log("Delete Client", details=f"ID: {client_id}")
+
+    client = db.query(ClientDB).filter(ClientDB.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found.")
+
+    db.delete(client)
+    db.commit()
+
+    return {"message": "Client deleted."}
+
+
+# --- Order Endpoints ---
+
+@app.post("/orders")
+def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
+    """Create a new order with items and auto-calculate totals."""
+    audit_log("Create Order", details=f"Client ID: {order_data.client_id}, Date: {order_data.date}")
+
+    # Verify client exists
+    client = db.query(ClientDB).filter(ClientDB.id == order_data.client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found.")
+
+    # Set defaults for placed_by and mobile_number from client if not provided
+    placed_by = order_data.placed_by or client.contact_person
+    mobile_number = order_data.mobile_number or client.mobile_number
+
+    # Create order
+    db_order = OrderDB(
+        client_id=order_data.client_id,
+        project_name=order_data.project_name,
+        file_path=order_data.file_path,
+        date=order_data.date,
+        placed_by=placed_by,
+        mobile_number=mobile_number,
+        discount=order_data.discount,
+        status=order_data.status
+    )
+
+    # Create items
+    for item_data in order_data.items:
+        db_item = ItemDB(**item_data.dict())
+        db_order.items.append(db_item)
+
+    # Calculate totals
+    calculate_order_totals(db_order)
+
+    db.add(db_order)
+    db.commit()
+    db.refresh(db_order)
+
+    return {"message": "Order created.", "id": db_order.id}
+
+
+@app.get("/orders")
+def list_orders(db: Session = Depends(get_db)):
+    """List all orders."""
+    orders = db.query(OrderDB).all()
+    return orders
+
+
+@app.get("/orders/{order_id}")
+def get_order(order_id: int, db: Session = Depends(get_db)):
+    """Get a specific order."""
+    order = db.query(OrderDB).filter(OrderDB.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
+    return order
+
+
+@app.get("/clients/{client_id}/orders")
+def get_client_orders(client_id: int, db: Session = Depends(get_db)):
+    """Get all orders for a specific client."""
+    client = db.query(ClientDB).filter(ClientDB.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found.")
+
+    orders = db.query(OrderDB).filter(OrderDB.client_id == client_id).all()
+    return orders
+
+
+@app.put("/orders/{order_id}")
+def update_order(order_id: int, order_data: OrderUpdate, db: Session = Depends(get_db)):
+    """Update a specific order and recalculate totals."""
+    audit_log("Update Order", details=f"ID: {order_id}")
+
+    order = db.query(OrderDB).filter(OrderDB.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
+
+    # Update provided fields
+    for key, value in order_data.dict(exclude_unset=True).items():
+        setattr(order, key, value)
+
+    # Recalculate totals
+    calculate_order_totals(order)
+
+    db.commit()
+    db.refresh(order)
+
+    return {"message": "Order updated."}
+
+
+@app.delete("/orders/{order_id}")
+def delete_order(order_id: int, db: Session = Depends(get_db)):
+    """Delete a specific order (cascades to items)."""
+    audit_log("Delete Order", details=f"ID: {order_id}")
+
+    order = db.query(OrderDB).filter(OrderDB.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
+
+    db.delete(order)
+    db.commit()
+
+    return {"message": "Order deleted."}
+
+
+@app.post("/orders/{order_id}/items")
+def add_order_item(order_id: int, item_data: ItemCreate, db: Session = Depends(get_db)):
+    """Add an item to an existing order and recalculate totals."""
+    audit_log("Add Order Item", details=f"Order ID: {order_id}")
+
+    order = db.query(OrderDB).filter(OrderDB.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
+
+    db_item = ItemDB(**item_data.dict(), order_id=order_id)
+    db.add(db_item)
+
+    # Recalculate order totals
+    order.items.append(db_item)
+    calculate_order_totals(order)
+
+    db.commit()
+    db.refresh(order)
+
+    return {"message": "Item added.", "order_id": order_id, "item_id": db_item.id}
+
+
+@app.put("/orders/{order_id}/items/{item_id}")
+def update_order_item(order_id: int, item_id: int, item_data: ItemUpdate, db: Session = Depends(get_db)):
+    """Update an item in an order and recalculate totals."""
+    audit_log("Update Order Item", details=f"Order ID: {order_id}, Item ID: {item_id}")
+
+    order = db.query(OrderDB).filter(OrderDB.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
+
+    item = db.query(ItemDB).filter(ItemDB.id == item_id, ItemDB.order_id == order_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found.")
+
+    # Update item fields
+    for key, value in item_data.dict(exclude_unset=True).items():
+        setattr(item, key, value)
+
+    # Recalculate order totals
+    calculate_order_totals(order)
+
+    db.commit()
+    db.refresh(order)
+
+    return {"message": "Item updated."}
+
+
+@app.delete("/orders/{order_id}/items/{item_id}")
+def delete_order_item(order_id: int, item_id: int, db: Session = Depends(get_db)):
+    """Delete an item from an order and recalculate totals."""
+    audit_log("Delete Order Item", details=f"Order ID: {order_id}, Item ID: {item_id}")
+
+    order = db.query(OrderDB).filter(OrderDB.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
+
+    item = db.query(ItemDB).filter(ItemDB.id == item_id, ItemDB.order_id == order_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found.")
+
+    db.delete(item)
+
+    # Recalculate order totals
+    calculate_order_totals(order)
+
+    db.commit()
+
+    return {"message": "Item deleted."}
 
 
 # --- Database API Endpoints ---
