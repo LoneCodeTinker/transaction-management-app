@@ -11,7 +11,7 @@ from .models import (
     TransactionDB, TransactionCreate, TransactionUpdate, Transaction,
     ClientDB, ClientCreate, ClientUpdate, Client,
     OrderDB, OrderCreate, OrderUpdate, Order,
-    ItemDB, ItemCreate, Item
+    ItemDB, ItemCreate, ItemUpdate, Item
 )
 
 

@@ -37,13 +37,13 @@ Starting database migration...
 ## Start Backend
 
 ```bash
-uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8001
 ```
 
 ## Test Create Client
 
 ```bash
-curl -X POST http://localhost:8000/clients \
+curl -X POST http://localhost:8001/clients \
   -H "Content-Type: application/json" \
   -d "{
     \"display_name\": \"ABC Company\",
