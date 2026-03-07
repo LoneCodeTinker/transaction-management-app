@@ -167,6 +167,19 @@ class OrderCreate(BaseModel):
     items: list[ItemCreate] = []
 
 
+class StructuredOrderCreate(BaseModel):
+    """Order creation with client name lookup instead of client_id."""
+    client_name: str
+    project_name: Optional[str] = None
+    file_path: Optional[str] = None
+    date: DateType
+    placed_by: Optional[str] = None
+    mobile_number: Optional[str] = None
+    discount: float = 0
+    status: Optional[str] = None
+    items: list[ItemCreate] = []
+
+
 class OrderUpdate(BaseModel):
     project_name: Optional[str] = None
     file_path: Optional[str] = None

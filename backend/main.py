@@ -10,9 +10,10 @@ from .database import engine, SessionLocal, Base, get_db, init_db
 from .models import (
     TransactionDB, TransactionCreate, TransactionUpdate, Transaction,
     ClientDB, ClientCreate, ClientUpdate, Client,
-    OrderDB, OrderCreate, OrderUpdate, Order,
+    OrderDB, OrderCreate, OrderUpdate, Order, StructuredOrderCreate,
     ItemDB, ItemCreate, ItemUpdate, Item
 )
+from .order_service import OrderService
 
 
 app = FastAPI(title="Orders Tracking API")
@@ -78,31 +79,6 @@ app.add_middleware(
 )
 
 VALID_TRANSACTION_TYPES = {"sales", "received", "purchases", "expenses"}
-
-
-# --- Order Calculation Helper Functions ---
-def calculate_item_total(quantity: float, price: float) -> float:
-    """Calculate item total = quantity × price."""
-    return quantity * price
-
-
-def calculate_order_totals(order: OrderDB) -> None:
-    """Calculate and update order totals based on items."""
-    # Calculate item totals
-    order_total = 0
-    total_item_discounts = 0
-    vat_total = 0
-
-    for item in order.items:
-        item.total = calculate_item_total(item.quantity, item.price)
-        order_total += item.total
-        total_item_discounts += item.per_item_discount
-        vat_total += item.vat
-
-    order.order_total = order_total
-    order.total_after_discount = order_total - order.discount - total_item_discounts
-    order.vat_total = vat_total
-    order.total_with_vat = order.total_after_discount + vat_total
 
 
 # --- Client Endpoints ---
@@ -176,40 +152,63 @@ def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
     """Create a new order with items and auto-calculate totals."""
     audit_log("Create Order", details=f"Client ID: {order_data.client_id}, Date: {order_data.date}")
 
-    # Verify client exists
-    client = db.query(ClientDB).filter(ClientDB.id == order_data.client_id).first()
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found.")
+    try:
+        order = OrderService.create_order(
+            db=db,
+            client_id=order_data.client_id,
+            project_name=order_data.project_name,
+            file_path=order_data.file_path,
+            date=order_data.date,
+            placed_by=order_data.placed_by,
+            mobile_number=order_data.mobile_number,
+            discount=order_data.discount,
+            status=order_data.status,
+            items=[item.dict() for item in order_data.items]
+        )
+        return {"message": "Order created.", "id": order.id}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
-    # Set defaults for placed_by and mobile_number from client if not provided
-    placed_by = order_data.placed_by or client.contact_person
-    mobile_number = order_data.mobile_number or client.mobile_number
 
-    # Create order
-    db_order = OrderDB(
-        client_id=order_data.client_id,
-        project_name=order_data.project_name,
-        file_path=order_data.file_path,
-        date=order_data.date,
-        placed_by=placed_by,
-        mobile_number=mobile_number,
-        discount=order_data.discount,
-        status=order_data.status
-    )
+@app.post("/orders/structured")
+def create_order_structured(order_data: StructuredOrderCreate, db: Session = Depends(get_db)):
+    """
+    Create a new order with structured item array and client name lookup.
+    
+    Unlike POST /orders which requires client_id, this endpoint:
+    - Accepts client_name for lookup or auto-creation
+    - Accepts items as structured array instead of serialized string
+    - Auto-creates client if name doesn't exist
+    """
+    audit_log("Create Order (Structured)", details=f"Client Name: {order_data.client_name}, Date: {order_data.date}")
 
-    # Create items
-    for item_data in order_data.items:
-        db_item = ItemDB(**item_data.dict())
-        db_order.items.append(db_item)
+    try:
+        # Look up or create client by display_name
+        client = db.query(ClientDB).filter(ClientDB.display_name == order_data.client_name).first()
+        if not client:
+            # Client doesn't exist, create a new one
+            client = ClientDB(display_name=order_data.client_name)
+            db.add(client)
+            db.commit()
+            db.refresh(client)
+            audit_log("Create Client (Auto)", details=f"Name: {order_data.client_name} (auto-created for order)")
 
-    # Calculate totals
-    calculate_order_totals(db_order)
-
-    db.add(db_order)
-    db.commit()
-    db.refresh(db_order)
-
-    return {"message": "Order created.", "id": db_order.id}
+        # Use OrderService to create order
+        order = OrderService.create_order(
+            db=db,
+            client_id=client.id,
+            project_name=order_data.project_name,
+            file_path=order_data.file_path,
+            date=order_data.date,
+            placed_by=order_data.placed_by,
+            mobile_number=order_data.mobile_number,
+            discount=order_data.discount,
+            status=order_data.status,
+            items=[item.dict() for item in order_data.items]
+        )
+        return {"message": "Order created.", "id": order.id, "client_id": order.client_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/orders")
@@ -253,7 +252,7 @@ def update_order(order_id: int, order_data: OrderUpdate, db: Session = Depends(g
         setattr(order, key, value)
 
     # Recalculate totals
-    calculate_order_totals(order)
+    OrderService.calculate_order_totals(order)
 
     db.commit()
     db.refresh(order)
@@ -290,7 +289,7 @@ def add_order_item(order_id: int, item_data: ItemCreate, db: Session = Depends(g
 
     # Recalculate order totals
     order.items.append(db_item)
-    calculate_order_totals(order)
+    OrderService.calculate_order_totals(order)
 
     db.commit()
     db.refresh(order)
@@ -316,7 +315,7 @@ def update_order_item(order_id: int, item_id: int, item_data: ItemUpdate, db: Se
         setattr(item, key, value)
 
     # Recalculate order totals
-    calculate_order_totals(order)
+    OrderService.calculate_order_totals(order)
 
     db.commit()
     db.refresh(order)
@@ -340,7 +339,7 @@ def delete_order_item(order_id: int, item_id: int, db: Session = Depends(get_db)
     db.delete(item)
 
     # Recalculate order totals
-    calculate_order_totals(order)
+    OrderService.calculate_order_totals(order)
 
     db.commit()
 
