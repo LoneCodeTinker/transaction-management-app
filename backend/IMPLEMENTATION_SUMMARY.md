@@ -179,7 +179,7 @@ python -m backend.migrate
 
 ### Create a Client:
 ```bash
-curl -X POST http://localhost:8000/clients \
+curl -X POST http://localhost:8001/clients \
   -H "Content-Type: application/json" \
   -d '{
     "display_name": "Test Client",
@@ -190,7 +190,7 @@ curl -X POST http://localhost:8000/clients \
 
 ### Create an Order:
 ```bash
-curl -X POST http://localhost:8000/orders \
+curl -X POST http://localhost:8001/orders \
   -H "Content-Type: application/json" \
   -d '{
     "client_id": 1,
@@ -211,7 +211,7 @@ curl -X POST http://localhost:8000/orders \
 
 ### Get Order with Calculated Totals:
 ```bash
-curl http://localhost:8000/orders/1
+curl http://localhost:8001/orders/1
 ```
 
 ## Files Modified

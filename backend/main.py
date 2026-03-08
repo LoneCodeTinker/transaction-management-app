@@ -51,7 +51,7 @@ for name in ('uvicorn', 'uvicorn.error', 'uvicorn.access'):
 # --- Access Log & IP Log Middleware ---
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    ip = request.client.host
+    ip = request.client.host if request.client else "unknown"  # pyright: ignore
     logging.info(f"Access from IP: {ip}, Path: {request.url.path}, Method: {request.method}")
     response = await call_next(request)
     logging.info(f"Response status: {response.status_code} for {request.url.path} from IP: {ip}")
@@ -60,7 +60,8 @@ async def log_requests(request: Request, call_next):
 # --- Error Logging ---
 @app.exception_handler(Exception)
 async def log_exceptions(request: Request, exc: Exception):
-    logging.error(f"Error for {request.url.path} from IP: {request.client.host}: {exc}")
+    ip = request.client.host if request.client else "unknown"  # pyright: ignore
+    logging.error(f"Error for {request.url.path} from IP: {ip}: {exc}")
     return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 # --- Audit Log Helper ---
@@ -196,7 +197,7 @@ def create_order_structured(order_data: StructuredOrderCreate, db: Session = Dep
         # Use OrderService to create order
         order = OrderService.create_order(
             db=db,
-            client_id=client.id,
+            client_id=int(client.id),  # pyright: ignore
             project_name=order_data.project_name,
             file_path=order_data.file_path,
             date=order_data.date,
@@ -434,6 +435,12 @@ def update_transaction(tx_type: str, tx_id: int, updated: dict = Body(...), db: 
     for key, value in updated.items():
         if key == "actions" and isinstance(value, list):
             setattr(transaction, key, ','.join(value))
+        elif key == "date" and isinstance(value, str):
+            # Convert string date to date object
+            try:
+                setattr(transaction, key, datetime.strptime(value, "%Y-%m-%d").date())
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=400, detail=f"Invalid date format for {key}. Use YYYY-MM-DD.")
         elif hasattr(transaction, key):
             setattr(transaction, key, value)
     

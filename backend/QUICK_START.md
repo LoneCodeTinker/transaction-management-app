@@ -64,7 +64,7 @@ Response:
 ## Test Create Order with Items
 
 ```bash
-curl -X POST http://localhost:8000/orders \
+curl -X POST http://localhost:8001/orders \
   -H "Content-Type: application/json" \
   -d "{
     \"client_id\": 1,
@@ -101,7 +101,7 @@ Response:
 ## Test Get Order (with auto-calculated totals)
 
 ```bash
-curl http://localhost:8000/orders/1
+curl http://localhost:8001/orders/1
 ```
 
 Response:
