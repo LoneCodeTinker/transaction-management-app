@@ -403,6 +403,26 @@ function App() {
   const salesVATTotal = +(salesTotalAfterDiscount * (salesVAT ? 0.15 : 0)).toFixed(2);
   const salesTotalWithVAT = +(salesTotalAfterDiscount + salesVATTotal).toFixed(2);
 
+  // Helper to create structured order payload for POST /orders/structured
+  function createStructuredOrderPayload() {
+    const structuredItems = salesItems
+      .filter(item => item.description.trim()) // Only include items with description
+      .map(item => ({
+        description: item.description,
+        quantity: parseInt(item.quantity.toString()) || 1,
+        price: parseFloat(item.price.toString()) || 0,
+        vat: parseFloat(item.vat.toString()) || 0,
+      }));
+    
+    return {
+      client_name: form.name,
+      project_name: '', // Optional, can be empty
+      date: form.date,
+      items: structuredItems,
+      discount: salesDiscount,
+    };
+  }
+
   // Helper to flatten sales items and references for backend
   function salesDescriptionString(items: typeof salesItems) {
     // Compose items string, then append discount as last item
@@ -474,13 +494,14 @@ function App() {
         return;
       }
       try {
-        const res = await fetch('/transaction', {
+        const structuredPayload = createStructuredOrderPayload();
+        const res = await fetch('/orders/structured', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(structuredPayload),
         });
         if (res.ok) {
-          setMessage('Transaction saved!');
+          setMessage('Order saved!');
           setForm({ name: '', date: today });
           setSalesItems([{ description: '', quantity: 1, price: '', total: 0, vat: 0 }]);
           setSalesDiscount(0);
@@ -491,7 +512,7 @@ function App() {
           setFormDone(false);
         } else {
           const data = await res.json();
-          setMessage(data.detail || 'Error saving transaction');
+          setMessage(data.detail || 'Error saving order');
         }
       } catch (err) {
         setMessage('Network error');
