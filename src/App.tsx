@@ -103,7 +103,10 @@ function App() {
     const fetchTransactions = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/transactions/${activeTab}`); // Use relative path for proxy
+        // For sales tab, fetch from new /orders endpoint
+        // For other tabs, fetch from legacy /transactions endpoint
+        const endpoint = activeTab === 'sales' ? '/orders' : `/transactions/${activeTab}`;
+        const res = await fetch(endpoint);
         if (res.ok) {
           const data = await res.json();
           setTransactions(data);
@@ -481,8 +484,9 @@ function App() {
             setActions([]);
             setPaidStatus('none');
             setFormDone(false);
-            // Refetch transactions
-            const res2 = await fetch(`/transactions/${activeTab}`);
+            // Refetch transactions/orders
+            const endpoint = activeTab === 'sales' ? '/orders' : `/transactions/${activeTab}`;
+            const res2 = await fetch(endpoint);
             if (res2.ok) setTransactions(await res2.json());
           } else {
             const data = await res.json();
@@ -510,6 +514,9 @@ function App() {
           setActions([]);
           setPaidStatus('none');
           setFormDone(false);
+          // Refetch orders from new endpoint
+          const orderRes = await fetch('/orders');
+          if (orderRes.ok) setTransactions(await orderRes.json());
         } else {
           const data = await res.json();
           setMessage(data.detail || 'Error saving order');
