@@ -144,18 +144,26 @@ function App() {
     });
     setFormDone(!!tx.Done); // Set formDone from transaction
     if (activeTab === 'sales') {
-      const items = parseSalesDescription(tx.Description);
+      // For orders, use structured items array instead of parsing description
+      const items = (tx.items && Array.isArray(tx.items)) 
+        ? tx.items.map((item: any) => ({
+            description: item.description || '',
+            quantity: item.quantity || 1,
+            price: item.price?.toString() || '',
+            total: item.total || 0,
+            vat: item.vat || 0
+          }))
+        : [{ description: '', quantity: 1, price: '', total: 0, vat: 0 }];
       setSalesItems(items);
-      setSalesDiscount((items as any).discount || 0);
-      setSalesVAT(!!tx.VAT);
-      // Parse references
-      const ref: ReferenceFields = {
-        quotation: { checked: /Quotation#/i.test(tx.Reference), value: (tx.Reference?.match(/Quotation#(\d+)/i)?.[1] || '') },
-        invoice: { checked: /Invoice#/i.test(tx.Reference), value: (tx.Reference?.match(/Invoice#(\d+)/i)?.[1] || '') },
-        qb: { checked: /QB#/i.test(tx.Reference), value: (tx.Reference?.match(/QB#(\d+)/i)?.[1] || '') },
-        qbEst: { checked: /QB Est\.#/i.test(tx.Reference), value: (tx.Reference?.match(/QB Est#(\d+)/i)?.[1] || '') },
-      };
-      setReferenceFields(ref);
+      setSalesDiscount(tx.discount || 0);
+      setSalesVAT(!!tx.vat_total);
+      // Clear reference fields for orders (they don't use references)
+      setReferenceFields({
+        quotation: { checked: false, value: '' },
+        invoice: { checked: false, value: '' },
+        qb: { checked: false, value: '' },
+        qbEst: { checked: false, value: '' }
+      });
     }
     if (activeTab === 'received') {
       setReceivedMethod(tx.Method || 'cash');
@@ -163,55 +171,26 @@ function App() {
     // Do not change showDone when editing a transaction
   };
 
-  // Helper to parse sales description string into items array
-  function parseSalesDescription(desc: string) {
-    if (!desc) return [{ description: '', quantity: 1, price: '', total: 0, vat: 0 }];
-    const parts = desc.split(';').map(s => s.trim());
-    let discount = 0;
-    // Check if last part is Discount
-    if (parts.length && /^Discount:/.test(parts[parts.length-1])) {
-      const m = parts[parts.length-1].match(/^Discount:\s*([\d.]+)/);
-      if (m) discount = parseFloat(m[1]);
-      parts.pop();
-    }
-    const items = parts.map(itemStr => {
-      const m = itemStr.match(/#\d+:\s*(.*?)\s*\|\s*Qty:\s*(\d+)\s*\|\s*Price:\s*([\d.]+)\s*\|\s*Total:\s*([\d.]+)\s*\|\s*VAT:\s*([\d.]+)/i);
-      if (m) {
-        return {
-          description: m[1].trim(),
-          quantity: parseInt(m[2]),
-          price: m[3],
-          total: parseFloat(m[4]),
-          vat: parseFloat(m[5]),
-        };
-      }
-      // fallback: just description
-      return { description: itemStr.trim(), quantity: 1, price: '', total: 0, vat: 0 };
-    });
-    // Attach discount as a property for external use
-    (items as any).discount = discount;
-    return items;
-  }
-
-  // Helper to summarize sales description for table
+  // Helper to summarize sales order items for table display
   function salesSummary(tx: any) {
-    if (!tx.Description) return '';
-    const items = parseSalesDescription(tx.Description);
-    const itemCount = items.length;
-    const isTax = !!tx.VAT && tx.VAT > 0;
+    if (!tx.items || !Array.isArray(tx.items)) return '';
+    const itemCount = tx.items.length;
+    const isTax = !!tx.vat_total && tx.vat_total > 0;
     return `${itemCount} item${itemCount > 1 ? 's' : ''}, ${isTax ? 'Tax' : 'Non-tax'} client`;
   }
 
-  // Add handler to delete transaction
+  // Add handler to delete transaction/order
   const handleDeleteTransaction = async (txId: number) => {
     if (!window.confirm('Are you sure you want to delete this transaction?')) return;
     try {
-      const res = await fetch(`/transactions/${activeTab}/${txId}`, { method: 'DELETE' });
+      const endpoint = activeTab === 'sales' ? `/orders/${txId}` : `/transactions/${activeTab}/${txId}`;
+      const res = await fetch(endpoint, { method: 'DELETE' });
       if (res.ok) {
         setMessage('Transaction deleted!');
         setEditIdx(null);
-        // Refetch transactions
-        const res2 = await fetch(`/transactions/${activeTab}`);
+        // Refetch transactions/orders
+        const fetchEndpoint = activeTab === 'sales' ? '/orders' : `/transactions/${activeTab}`;
+        const res2 = await fetch(fetchEndpoint);
         if (res2.ok) setTransactions(await res2.json());
       } else {
         setMessage('Error deleting transaction');
@@ -466,32 +445,81 @@ function App() {
         done: formDone, // Use formDone for transaction
       };
       if (editIdx !== null) {
-        // Update transaction with full payload
+        // Update order/transaction
         try {
-          const res = await fetch(`/transactions/${activeTab}/${editIdx}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          if (res.ok) {
-            setMessage('Transaction updated!');
-            setEditIdx(null);
-            setForm({ name: '', date: today });
-            setSalesItems([{ description: '', quantity: 1, price: '', total: 0, vat: 0 }]);
-            setSalesDiscount(0);
-            setSalesVAT(true);
-            setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' }, qbEst: { checked: false, value: '' } });
-            setActions([]);
-            setPaidStatus('none');
-            setFormDone(false);
-            // Refetch transactions/orders
-            const endpoint = activeTab === 'sales' ? '/orders' : `/transactions/${activeTab}`;
-            const res2 = await fetch(endpoint);
-            if (res2.ok) setTransactions(await res2.json());
+          if (activeTab === 'sales') {
+            // For orders: update order header and items
+            const orderUpdatePayload = {
+              date: form.date,
+              placed_by: form.name, // Use customer name as placed_by for now
+              discount: salesDiscount,
+            };
+            const orderRes = await fetch(`/orders/${editIdx}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(orderUpdatePayload),
+            });
+            if (!orderRes.ok) {
+              const errData = await orderRes.json();
+              setMessage(errData.detail || 'Error updating order');
+              return;
+            }
+            
+            // Delete old items and create new ones
+            const getRes = await fetch(`/orders/${editIdx}`);
+            if (getRes.ok) {
+              const order = await getRes.json();
+              // Delete existing items
+              for (const item of (order.items || [])) {
+                await fetch(`/orders/${editIdx}/items/${item.id}`, { method: 'DELETE' });
+              }
+            }
+            
+            // Add new items
+            for (const item of salesItems) {
+              if (item.description.trim()) {
+                await fetch(`/orders/${editIdx}/items`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    description: item.description,
+                    quantity: parseInt(item.quantity.toString()) || 1,
+                    price: parseFloat(item.price.toString()) || 0,
+                    vat: parseFloat(item.vat.toString()) || 0,
+                  }),
+                });
+              }
+            }
+            
+            setMessage('Order updated!');
           } else {
-            const data = await res.json();
-            setMessage(data.detail || 'Error updating transaction');
+            // For transactions, use old endpoint
+            const res = await fetch(`/transactions/${activeTab}/${editIdx}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            if (!res.ok) {
+              const data = await res.json();
+              setMessage(data.detail || 'Error updating transaction');
+              return;
+            }
+            setMessage('Transaction updated!');
           }
+          
+          setEditIdx(null);
+          setForm({ name: '', date: today });
+          setSalesItems([{ description: '', quantity: 1, price: '', total: 0, vat: 0 }]);
+          setSalesDiscount(0);
+          setSalesVAT(true);
+          setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' }, qbEst: { checked: false, value: '' } });
+          setActions([]);
+          setPaidStatus('none');
+          setFormDone(false);
+          // Refetch transactions/orders
+          const endpoint = activeTab === 'sales' ? '/orders' : `/transactions/${activeTab}`;
+          const res2 = await fetch(endpoint);
+          if (res2.ok) setTransactions(await res2.json());
         } catch {
           setMessage('Network error');
         }
@@ -959,23 +987,24 @@ function App() {
                       Date {sort.key === 'Date' && (sort.direction === 'asc' ? '▲' : '▼')}
                     </th>
                     {activeTab === 'sales' && <th>Description</th>}
-                    {activeTab !== 'received' && <th onClick={() => setSort(s => ({ key: 'Reference', direction: s.key === 'Reference' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                    {activeTab !== 'sales' && activeTab !== 'received' && <th onClick={() => setSort(s => ({ key: 'Reference', direction: s.key === 'Reference' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
                       Reference {sort.key === 'Reference' && (sort.direction === 'asc' ? '▲' : '▼')}
                     </th>}
-                    {/* Remove Amount column for sales */}
-                    {activeTab !== 'sales' && <th onClick={() => setSort(s => ({ key: 'Amount', direction: s.key === 'Amount' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                    {/* Amount column only for non-sales, non-received */}
+                    {activeTab !== 'sales' && activeTab !== 'received' && <th onClick={() => setSort(s => ({ key: 'Amount', direction: s.key === 'Amount' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
                       Amount {sort.key === 'Amount' && (sort.direction === 'asc' ? '▲' : '▼')}
                     </th>}
                     {activeTab === 'purchases' && <th>VAT</th>}
+                    {/* Total column for non-received */}
                     {activeTab !== 'received' && <th onClick={() => setSort(s => ({ key: 'Total', direction: s.key === 'Total' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
                       Total {sort.key === 'Total' && (sort.direction === 'asc' ? '▲' : '▼')}
                     </th>}
                     {activeTab === 'received' && <th>Notes</th>}
                     {activeTab === 'received' && <th>Method</th>}
                     <th style={{ width: 64, minWidth: 64, maxWidth: 64, textAlign: 'center' }}>Actions</th>
-                    <th onClick={() => setSort(s => ({ key: 'Done', direction: s.key === 'Done' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
+                    {activeTab !== 'sales' && <th onClick={() => setSort(s => ({ key: 'Done', direction: s.key === 'Done' && s.direction === 'asc' ? 'desc' : 'asc' }))} style={{cursor:'pointer'}}>
                       Done {sort.key === 'Done' && (sort.direction === 'asc' ? '▲' : '▼')}
-                    </th>
+                    </th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -998,11 +1027,12 @@ function App() {
                         <td>{tx.Name}</td>
                         <td>{tx.Date}</td>
                         {activeTab === 'sales' && <td>{salesSummary(tx)}</td>}
-                        {activeTab !== 'received' && <td>{tx.Reference}</td>}
-                        {/* Remove Amount column for sales */}
-                        {activeTab !== 'sales' && <td>{tx.Amount}</td>}
+                        {activeTab !== 'sales' && activeTab !== 'received' && <td>{tx.Reference}</td>}
+                        {/* Amount for non-sales, non-received transactions */}
+                        {activeTab !== 'sales' && activeTab !== 'received' && <td>{tx.Amount}</td>}
                         {activeTab === 'purchases' && <td>{tx.VAT}</td>}
-                        {activeTab !== 'received' && <td>{tx.Total}</td>}
+                        {/* Total for sales shows total_with_vat, others show Total */}
+                        {activeTab !== 'received' && <td>{activeTab === 'sales' ? tx.total_with_vat : tx.Total}</td>}
                         {activeTab === 'received' && <td>{tx.Description}</td>}
                         {activeTab === 'received' && <td>{tx.Method ? (tx.Method.charAt(0).toUpperCase() + tx.Method.slice(1)) : ''}</td>}
                         <td style={{ width: 64, minWidth: 64, maxWidth: 64, textAlign: 'center' }}>
@@ -1013,29 +1043,22 @@ function App() {
                             <img src={delIcon} alt="Delete" style={{width:22,height:22,verticalAlign:'middle'}} />
                           </button>
                         </td>
-                        <td>{tx.Done ? <img src={DoneCheckMark} alt="Done" style={{width:22,height:22,display:'block',margin:'0 auto'}} /> : ''}</td>
+                        {activeTab !== 'sales' && <td>{tx.Done ? <img src={DoneCheckMark} alt="Done" style={{width:22,height:22,display:'block',margin:'0 auto'}} /> : ''}</td>}
                       </tr>
-                      {/* Expandable details row for sales */}
+                      {/* Expandable details row for sales - now uses structured items array */}
                       {activeTab === 'sales' && expandedRows.has(tx.id) && (
                         <tr className="expanded-row-details">
                           <td colSpan={8} style={{background:'#f9f9f9',padding:'8px 16px'}}>
                             <strong>Items:</strong>
                             <ul style={{margin:'8px 0 0 0',padding:'0 0 0 16px'}}>
-                              {(() => {
-                                const items = parseSalesDescription(tx.Description);
-                                return items.map((item, idx) => (
-                                  <li key={idx}>{item.description} | Qty: {item.quantity} | Price: {item.price} | Total: {item.total} | VAT: {item.vat}</li>
-                                ));
-                              })()}
+                              {(tx.items && Array.isArray(tx.items) ? tx.items : []).map((item: any, idx: number) => (
+                                <li key={idx}>{item.description} | Qty: {item.quantity} | Price: {item.price?.toFixed(2)} | Total: {item.total?.toFixed(2)} | VAT: {item.vat?.toFixed(2)}</li>
+                              ))}
                             </ul>
-                            <div style={{marginTop:8}}><strong>VAT:</strong> {tx.VAT > 0 ? 'Taxed' : 'Not taxed'}</div>
-                            {(() => {
-                              const items = parseSalesDescription(tx.Description);
-                              const discount = (items as any).discount || 0;
-                              return discount > 0 ? (
-                                <div style={{marginTop:8}}><strong>Discount:</strong> {discount.toFixed(2)}</div>
-                              ) : null;
-                            })()}
+                            <div style={{marginTop:8}}><strong>VAT:</strong> {tx.vat_total > 0 ? 'Taxed' : 'Not taxed'}</div>
+                            {tx.discount > 0 && (
+                              <div style={{marginTop:8}}><strong>Discount:</strong> {tx.discount.toFixed(2)}</div>
+                            )}
                           </td>
                         </tr>
                       )}

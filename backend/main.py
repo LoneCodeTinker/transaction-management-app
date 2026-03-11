@@ -214,29 +214,134 @@ def create_order_structured(order_data: StructuredOrderCreate, db: Session = Dep
 
 @app.get("/orders")
 def list_orders(db: Session = Depends(get_db)):
-    """List all orders."""
+    """List all orders with client names and structured items."""
     orders = db.query(OrderDB).all()
-    return orders
+    
+    # Transform to response format with client names and items
+    result = []
+    for order in orders:
+        client_name = order.client.display_name if order.client else "Unknown"
+        order_dict = {
+            "id": order.id,
+            "client_id": order.client_id,
+            "Name": client_name,
+            "Date": order.date.isoformat() if isinstance(order.date, date) else order.date,
+            "project_name": order.project_name,
+            "placed_by": order.placed_by,
+            "mobile_number": order.mobile_number,
+            "order_total": order.order_total,
+            "discount": order.discount,
+            "total_after_discount": order.total_after_discount,
+            "vat_total": order.vat_total,
+            "total_with_vat": order.total_with_vat,
+            "status": order.status,
+            "items": [
+                {
+                    "id": item.id,
+                    "order_id": item.order_id,
+                    "description": item.description,
+                    "quantity": item.quantity,
+                    "price": item.price,
+                    "total": item.total,
+                    "per_item_discount": item.per_item_discount,
+                    "vat": item.vat
+                }
+                for item in order.items
+            ],
+            "created_at": order.created_at.isoformat() if isinstance(order.created_at, datetime) else order.created_at,
+            "updated_at": order.updated_at.isoformat() if isinstance(order.updated_at, datetime) else order.updated_at,
+        }
+        result.append(order_dict)
+    
+    return JSONResponse(content=result)
 
 
 @app.get("/orders/{order_id}")
 def get_order(order_id: int, db: Session = Depends(get_db)):
-    """Get a specific order."""
+    """Get a specific order with client names and structured items."""
     order = db.query(OrderDB).filter(OrderDB.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found.")
-    return order
+    
+    client_name = order.client.display_name if order.client else "Unknown"
+    order_dict = {
+        "id": order.id,
+        "client_id": order.client_id,
+        "Name": client_name,
+        "Date": order.date.isoformat() if isinstance(order.date, date) else order.date,
+        "project_name": order.project_name,
+        "placed_by": order.placed_by,
+        "mobile_number": order.mobile_number,
+        "order_total": order.order_total,
+        "discount": order.discount,
+        "total_after_discount": order.total_after_discount,
+        "vat_total": order.vat_total,
+        "total_with_vat": order.total_with_vat,
+        "status": order.status,
+        "items": [
+            {
+                "id": item.id,
+                "order_id": item.order_id,
+                "description": item.description,
+                "quantity": item.quantity,
+                "price": item.price,
+                "total": item.total,
+                "per_item_discount": item.per_item_discount,
+                "vat": item.vat
+            }
+            for item in order.items
+        ],
+        "created_at": order.created_at.isoformat() if isinstance(order.created_at, datetime) else order.created_at,
+        "updated_at": order.updated_at.isoformat() if isinstance(order.updated_at, datetime) else order.updated_at,
+    }
+    return JSONResponse(content=order_dict)
 
 
 @app.get("/clients/{client_id}/orders")
 def get_client_orders(client_id: int, db: Session = Depends(get_db)):
-    """Get all orders for a specific client."""
+    """Get all orders for a specific client with structured items."""
     client = db.query(ClientDB).filter(ClientDB.id == client_id).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found.")
 
     orders = db.query(OrderDB).filter(OrderDB.client_id == client_id).all()
-    return orders
+    
+    # Transform to response format with client names and items
+    result = []
+    for order in orders:
+        order_dict = {
+            "id": order.id,
+            "client_id": order.client_id,
+            "Name": client.display_name,
+            "Date": order.date.isoformat() if isinstance(order.date, date) else order.date,
+            "project_name": order.project_name,
+            "placed_by": order.placed_by,
+            "mobile_number": order.mobile_number,
+            "order_total": order.order_total,
+            "discount": order.discount,
+            "total_after_discount": order.total_after_discount,
+            "vat_total": order.vat_total,
+            "total_with_vat": order.total_with_vat,
+            "status": order.status,
+            "items": [
+                {
+                    "id": item.id,
+                    "order_id": item.order_id,
+                    "description": item.description,
+                    "quantity": item.quantity,
+                    "price": item.price,
+                    "total": item.total,
+                    "per_item_discount": item.per_item_discount,
+                    "vat": item.vat
+                }
+                for item in order.items
+            ],
+            "created_at": order.created_at.isoformat() if isinstance(order.created_at, datetime) else order.created_at,
+            "updated_at": order.updated_at.isoformat() if isinstance(order.updated_at, datetime) else order.updated_at,
+        }
+        result.append(order_dict)
+    
+    return JSONResponse(content=result)
 
 
 @app.put("/orders/{order_id}")
