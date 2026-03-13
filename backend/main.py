@@ -346,16 +346,59 @@ def get_client_orders(client_id: int, db: Session = Depends(get_db)):
 
 @app.put("/orders/{order_id}")
 def update_order(order_id: int, order_data: OrderUpdate, db: Session = Depends(get_db)):
-    """Update a specific order and recalculate totals."""
+    """Update a specific order with smart item management and recalculate totals."""
     audit_log("Update Order", details=f"ID: {order_id}")
 
     order = db.query(OrderDB).filter(OrderDB.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found.")
 
-    # Update provided fields
-    for key, value in order_data.dict(exclude_unset=True).items():
+    # Extract items before updating other fields
+    items_payload = order_data.items if hasattr(order_data, 'items') and order_data.items is not None else None
+    
+    # Update provided non-item fields
+    update_dict = order_data.dict(exclude_unset=True, exclude={'items'})
+    for key, value in update_dict.items():
         setattr(order, key, value)
+
+    # Smart item management: update existing, create new, delete missing
+    if items_payload is not None:
+        # Collect IDs from payload
+        payload_item_ids = set()
+        
+        for item_data in items_payload:
+            item_id = item_data.id
+            
+            if item_id is not None:
+                # Update existing item
+                db_item = db.query(ItemDB).filter(
+                    ItemDB.id == item_id,
+                    ItemDB.order_id == order_id
+                ).first()
+                if db_item:
+                    # Update fields except id
+                    update_fields = item_data.dict(exclude={'id'}, exclude_unset=True)
+                    for key, value in update_fields.items():
+                        setattr(db_item, key, value)
+                    payload_item_ids.add(item_id)
+            else:
+                # Create new item (no id in payload)
+                if item_data.description.strip():  # Only create if description is not empty
+                    db_item = ItemDB(
+                        order_id=order_id,
+                        description=item_data.description,
+                        quantity=item_data.quantity,
+                        price=item_data.price,
+                        per_item_discount=item_data.per_item_discount,
+                        vat=item_data.vat
+                    )
+                    db.add(db_item)
+        
+        # Delete items not in payload
+        existing_items = db.query(ItemDB).filter(ItemDB.order_id == order_id).all()
+        for existing_item in existing_items:
+            if existing_item.id not in payload_item_ids:
+                db.delete(existing_item)
 
     # Recalculate totals
     OrderService.calculate_order_totals(order)
@@ -390,7 +433,15 @@ def add_order_item(order_id: int, item_data: ItemCreate, db: Session = Depends(g
     if not order:
         raise HTTPException(status_code=404, detail="Order not found.")
 
-    db_item = ItemDB(**item_data.dict(), order_id=order_id)
+    # Exclude id field when creating new item
+    db_item = ItemDB(
+        order_id=order_id,
+        description=item_data.description,
+        quantity=item_data.quantity,
+        price=item_data.price,
+        per_item_discount=item_data.per_item_discount,
+        vat=item_data.vat
+    )
     db.add(db_item)
 
     # Recalculate order totals

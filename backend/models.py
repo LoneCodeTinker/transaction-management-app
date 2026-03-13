@@ -125,6 +125,7 @@ class Client(BaseModel):
 
 # Item models
 class ItemCreate(BaseModel):
+    id: Optional[int] = None  # For updates: if present, update existing item; if None, create new
     description: str
     quantity: float = 1
     price: float = 0
@@ -188,6 +189,7 @@ class OrderUpdate(BaseModel):
     mobile_number: Optional[str] = None
     discount: Optional[float] = None
     status: Optional[str] = None
+    items: Optional[list[ItemCreate]] = None  # Optional items for smart update
 
 
 class Order(BaseModel):

@@ -147,6 +147,7 @@ function App() {
       // For orders, use structured items array instead of parsing description
       const items = (tx.items && Array.isArray(tx.items)) 
         ? tx.items.map((item: any) => ({
+            id: item.id, // Keep track of item ID for updates
             description: item.description || '',
             quantity: item.quantity || 1,
             price: item.price?.toString() || '',
@@ -448,12 +449,22 @@ function App() {
         // Update order/transaction
         try {
           if (activeTab === 'sales') {
-            // For orders: update order header and items
+            // For orders: update order header with items in single payload
             const orderUpdatePayload = {
               date: form.date,
-              placed_by: form.name, // Use customer name as placed_by for now
               discount: salesDiscount,
+              items: salesItems
+                .filter(item => item.description.trim())
+                .map((item: any) => ({
+                  id: item.id ?? undefined, // Include ID if it exists (for update)
+                  description: item.description,
+                  quantity: parseInt(item.quantity.toString()) || 1,
+                  price: parseFloat(item.price.toString()) || 0,
+                  vat: parseFloat(item.vat.toString()) || 0,
+                }))
+                .filter(item => item.id !== undefined || item.description.trim()) // Keep all items for update
             };
+            
             const orderRes = await fetch(`/orders/${editIdx}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
@@ -463,32 +474,6 @@ function App() {
               const errData = await orderRes.json();
               setMessage(errData.detail || 'Error updating order');
               return;
-            }
-            
-            // Delete old items and create new ones
-            const getRes = await fetch(`/orders/${editIdx}`);
-            if (getRes.ok) {
-              const order = await getRes.json();
-              // Delete existing items
-              for (const item of (order.items || [])) {
-                await fetch(`/orders/${editIdx}/items/${item.id}`, { method: 'DELETE' });
-              }
-            }
-            
-            // Add new items
-            for (const item of salesItems) {
-              if (item.description.trim()) {
-                await fetch(`/orders/${editIdx}/items`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    description: item.description,
-                    quantity: parseInt(item.quantity.toString()) || 1,
-                    price: parseFloat(item.price.toString()) || 0,
-                    vat: parseFloat(item.vat.toString()) || 0,
-                  }),
-                });
-              }
             }
             
             setMessage('Order updated!');
