@@ -393,14 +393,20 @@ def update_order(order_id: int, order_data: OrderUpdate, db: Session = Depends(g
                         vat=item_data.vat
                     )
                     db.add(db_item)
+                    order.items.append(db_item)  # Update in-memory relationship
         
-        # Delete items not in payload
-        existing_items = db.query(ItemDB).filter(ItemDB.order_id == order_id).all()
-        for existing_item in existing_items:
+        # Delete items not in payload - remove from both in-memory and database
+        items_to_delete = []
+        for existing_item in order.items:
             if existing_item.id not in payload_item_ids:
-                db.delete(existing_item)
+                items_to_delete.append(existing_item)
+        
+        for item_to_delete in items_to_delete:
+            order.items.remove(item_to_delete)  # Remove from in-memory relationship first
+            db.delete(item_to_delete)
 
-    # Recalculate totals
+    # Recalculate totals with final item set
+    # order.items is now in sync with database state, so totals will be correct
     OrderService.calculate_order_totals(order)
 
     db.commit()
