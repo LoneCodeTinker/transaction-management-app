@@ -1,9 +1,9 @@
 """Database configuration and session management for Orders Tracking app."""
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.sql import select
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm.exc import DetachedInstanceError
 import os
 
 # SQLite database file
@@ -14,40 +14,53 @@ engine = create_engine(
     connect_args={"check_same_thread": False}  # Required for SQLite with threading
 )
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
 
 
-# --- Soft Delete Global Filter ---
+# --- Custom Session with Soft Delete Support ---
 
-def apply_soft_delete_filter(select_stmt, **kw):
+class SoftDeleteSession(Session):
     """
-    SQLAlchemy event listener that automatically filters soft-deleted records.
+    Custom SQLAlchemy session that automatically filters soft-deleted records.
     
-    Adds 'WHERE deleted_at IS NULL' to all SELECT queries on models with deleted_at column.
-    Can be bypassed by setting execution_options(include_deleted=True).
+    Models that inherit from SoftDeleteMixin will automatically exclude
+    soft-deleted records (deleted_at IS NOT NULL) from queries.
+    
+    To include deleted records in a specific query, use:
+        query.execution_options(include_deleted=True)
     """
-    # Check if include_deleted flag is set to bypass filtering
-    if hasattr(select_stmt, '_execution_options') and select_stmt._execution_options.get('include_deleted', False):
-        return select_stmt
     
-    # Get all FROM clauses and their tables/entities
-    for frm in select_stmt.froms:
-        # Extract the mapped class from the FROM clause
-        mapper = getattr(frm, 'entity', None)
-        if mapper is None and hasattr(frm, 'mapped_table'):
-            mapper = frm.mapped_table.entity
+    def query(self, *entities, **kwargs):
+        """Override query to apply soft delete filter."""
+        result = super().query(*entities, **kwargs)
         
-        # If we found a mapper, check if it has deleted_at column
-        if mapper and hasattr(mapper, 'deleted_at'):
-            select_stmt = select_stmt.where(mapper.deleted_at.is_(None))
-    
-    return select_stmt
+        # Check if include_deleted flag is set
+        include_deleted = kwargs.get('include_deleted', False)
+        if include_deleted:
+            return result
+        
+        # Apply soft delete filter to each entity
+        from .models import SoftDeleteMixin
+        
+        for entity in entities:
+            # Handle both direct model classes and column/mapper objects
+            mapper_class = None
+            
+            if hasattr(entity, '__tablename__'):  # It's a model class
+                mapper_class = entity
+            elif hasattr(entity, 'class_'):  # It's a mapper or instrumented attribute
+                mapper_class = entity.class_
+            elif hasattr(entity, 'parent'):  # It's a column that has a parent mapper
+                mapper_class = entity.parent.class_
+            
+            # Apply filter if this model uses SoftDeleteMixin
+            if mapper_class and issubclass(mapper_class, SoftDeleteMixin):
+                result = result.filter(mapper_class.deleted_at.is_(None))
+        
+        return result
 
 
-# Attach the soft delete filter to all SELECT queries
-event.listen(select, "before_select", apply_soft_delete_filter, retval=True)
+SessionLocal = sessionmaker(bind=engine, class_=SoftDeleteSession)
 
 
 def get_db():

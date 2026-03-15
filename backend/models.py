@@ -3,7 +3,6 @@
 from sqlalchemy import Column, Integer, String, Float, Date, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from .database import Base
 from datetime import date as DateType, datetime
 from typing import Optional
 from pydantic import BaseModel
@@ -17,6 +16,9 @@ class SoftDeleteMixin:
     - deleted_at: Timestamp when record was deleted (NULL = not deleted)
     - deleted_by: User/system that deleted the record
     - is_deleted: Property to check if record is soft-deleted
+    
+    Models using this mixin will automatically exclude soft-deleted records
+    from queries via the custom SoftDeleteSession.
     """
     deleted_at = Column(DateTime, nullable=True, index=True)
     deleted_by = Column(String, nullable=True)
@@ -25,6 +27,10 @@ class SoftDeleteMixin:
     def is_deleted(self) -> bool:
         """Check if this record is soft-deleted."""
         return self.deleted_at is not None
+
+
+# Import Base after SoftDeleteMixin is defined to avoid circular imports
+from .database import Base
 
 
 class ClientDB(SoftDeleteMixin, Base):
