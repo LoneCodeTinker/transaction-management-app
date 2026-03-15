@@ -81,12 +81,17 @@ class OrderService:
         - order.total_after_discount (order_total - discount - per_item_discounts)
         - order.vat_total (sum of all item VATs)
         - order.total_with_vat (total_after_discount + vat_total)
+        
+        Note: Ignores soft-deleted items in calculations.
         """
         order_total = 0.0
         total_item_discounts = 0.0
         vat_total = 0.0
 
-        for item in order.items:
+        # Filter out soft-deleted items
+        active_items = [item for item in order.items if item.deleted_at is None]
+        
+        for item in active_items:
             item.total = OrderService.calculate_item_total(item.quantity, item.price)
             order_total += item.total
             total_item_discounts += item.per_item_discount

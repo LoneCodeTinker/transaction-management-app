@@ -9,7 +9,25 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-class ClientDB(Base):
+class SoftDeleteMixin:
+    """
+    Mixin to add soft delete capability to any model.
+    
+    Provides:
+    - deleted_at: Timestamp when record was deleted (NULL = not deleted)
+    - deleted_by: User/system that deleted the record
+    - is_deleted: Property to check if record is soft-deleted
+    """
+    deleted_at = Column(DateTime, nullable=True, index=True)
+    deleted_by = Column(String, nullable=True)
+    
+    @property
+    def is_deleted(self) -> bool:
+        """Check if this record is soft-deleted."""
+        return self.deleted_at is not None
+
+
+class ClientDB(SoftDeleteMixin, Base):
     """SQLAlchemy model for clients in the database."""
     __tablename__ = "clients"
 
@@ -26,7 +44,7 @@ class ClientDB(Base):
     orders = relationship("OrderDB", back_populates="client", cascade="all, delete-orphan")
 
 
-class OrderDB(Base):
+class OrderDB(SoftDeleteMixin, Base):
     """SQLAlchemy model for orders in the database."""
     __tablename__ = "orders"
 
@@ -50,7 +68,7 @@ class OrderDB(Base):
     items = relationship("ItemDB", back_populates="order", cascade="all, delete-orphan")
 
 
-class ItemDB(Base):
+class ItemDB(SoftDeleteMixin, Base):
     """SQLAlchemy model for order items in the database."""
     __tablename__ = "items"
 

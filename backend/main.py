@@ -7,6 +7,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from .database import engine, SessionLocal, Base, get_db, init_db
+from .backup_service import start_scheduler
 from .models import (
     TransactionDB, TransactionCreate, TransactionUpdate, Transaction,
     ClientDB, ClientCreate, ClientUpdate, Client,
@@ -20,6 +21,9 @@ app = FastAPI(title="Orders Tracking API")
 
 # Initialize database
 init_db()
+
+# Start backup scheduler
+backup_scheduler = start_scheduler()
 
 # --- Logging Setup ---
 logger = logging.getLogger()
@@ -133,14 +137,26 @@ def update_client(client_id: int, client_data: ClientUpdate, db: Session = Depen
 
 @app.delete("/clients/{client_id}")
 def delete_client(client_id: int, db: Session = Depends(get_db)):
-    """Delete a specific client (cascades to orders and items)."""
+    """Soft-delete a specific client (cascades to orders and items)."""
     audit_log("Delete Client", details=f"ID: {client_id}")
 
     client = db.query(ClientDB).filter(ClientDB.id == client_id).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found.")
 
-    db.delete(client)
+    # Soft-delete client and cascade to orders/items
+    client.deleted_at = datetime.utcnow()
+    client.deleted_by = "system"
+    
+    # Cascade soft-delete to all orders
+    for order in client.orders:
+        order.deleted_at = datetime.utcnow()
+        order.deleted_by = "system"
+        # Cascade soft-delete to all items in each order
+        for item in order.items:
+            item.deleted_at = datetime.utcnow()
+            item.deleted_by = "system"
+    
     db.commit()
 
     return {"message": "Client deleted."}
@@ -403,7 +419,9 @@ def update_order(order_id: int, order_data: OrderUpdate, db: Session = Depends(g
         
         for item_to_delete in items_to_delete:
             order.items.remove(item_to_delete)  # Remove from in-memory relationship first
-            db.delete(item_to_delete)
+            # Soft-delete item
+            item_to_delete.deleted_at = datetime.utcnow()
+            item_to_delete.deleted_by = "system"
 
     # Recalculate totals with final item set
     # order.items is now in sync with database state, so totals will be correct
@@ -417,14 +435,20 @@ def update_order(order_id: int, order_data: OrderUpdate, db: Session = Depends(g
 
 @app.delete("/orders/{order_id}")
 def delete_order(order_id: int, db: Session = Depends(get_db)):
-    """Delete a specific order (cascades to items)."""
+    """Soft-delete a specific order (cascades to items)."""
     audit_log("Delete Order", details=f"ID: {order_id}")
 
     order = db.query(OrderDB).filter(OrderDB.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found.")
 
-    db.delete(order)
+    # Soft-delete order and cascade to items
+    order.deleted_at = datetime.utcnow()
+    order.deleted_by = "system"
+    for item in order.items:
+        item.deleted_at = datetime.utcnow()
+        item.deleted_by = "system"
+    
     db.commit()
 
     return {"message": "Order deleted."}
@@ -488,7 +512,7 @@ def update_order_item(order_id: int, item_id: int, item_data: ItemUpdate, db: Se
 
 @app.delete("/orders/{order_id}/items/{item_id}")
 def delete_order_item(order_id: int, item_id: int, db: Session = Depends(get_db)):
-    """Delete an item from an order and recalculate totals."""
+    """Soft-delete an item from an order and recalculate totals."""
     audit_log("Delete Order Item", details=f"Order ID: {order_id}, Item ID: {item_id}")
 
     order = db.query(OrderDB).filter(OrderDB.id == order_id).first()
@@ -499,7 +523,9 @@ def delete_order_item(order_id: int, item_id: int, db: Session = Depends(get_db)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found.")
 
-    db.delete(item)
+    # Soft-delete item
+    item.deleted_at = datetime.utcnow()
+    item.deleted_by = "system"
 
     # Recalculate order totals
     OrderService.calculate_order_totals(order)
