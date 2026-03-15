@@ -1,6 +1,6 @@
 """SQLAlchemy ORM models for the Orders Tracking app."""
 
-from sqlalchemy import Column, Integer, String, Float, Date, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Date, Boolean, DateTime, ForeignKey, and_
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import date as DateType, datetime
@@ -71,7 +71,13 @@ class OrderDB(SoftDeleteMixin, Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     client = relationship("ClientDB", back_populates="orders")
-    items = relationship("ItemDB", back_populates="order", cascade="all, delete-orphan")
+    items = relationship(
+        "ItemDB",
+        primaryjoin=lambda: and_(ItemDB.order_id == OrderDB.id, ItemDB.deleted_at.is_(None)),
+        back_populates="order",
+        cascade="all, delete-orphan",
+        lazy="select"
+    )
 
 
 class ItemDB(SoftDeleteMixin, Base):

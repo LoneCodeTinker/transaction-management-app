@@ -379,28 +379,32 @@ def update_order(order_id: int, order_data: OrderUpdate, db: Session = Depends(g
 
     # Smart item management: update existing, create new, delete missing
     if items_payload is not None:
-        # Collect IDs from payload
-        payload_item_ids = set()
+        # 1) Load active items only (exclude soft-deleted)
+        active_items = (
+            db.query(ItemDB)
+            .filter(
+                ItemDB.order_id == order_id,
+                ItemDB.deleted_at.is_(None)
+            )
+            .all()
+        )
         
+        existing_items = {item.id: item for item in active_items}
+        payload_ids = set()
+        
+        # 2) Process payload items
         for item_data in items_payload:
-            item_id = item_data.id
-            
-            if item_id is not None:
-                # Update existing item
-                db_item = db.query(ItemDB).filter(
-                    ItemDB.id == item_id,
-                    ItemDB.order_id == order_id
-                ).first()
-                if db_item:
-                    # Update fields except id
-                    update_fields = item_data.dict(exclude={'id'}, exclude_unset=True)
-                    for key, value in update_fields.items():
-                        setattr(db_item, key, value)
-                    payload_item_ids.add(item_id)
+            if item_data.id and item_data.id in existing_items:
+                # UPDATE existing item
+                db_item = existing_items[item_data.id]
+                update_fields = item_data.dict(exclude={'id'}, exclude_unset=True)
+                for key, value in update_fields.items():
+                    setattr(db_item, key, value)
+                payload_ids.add(item_data.id)
             else:
-                # Create new item (no id in payload)
-                if item_data.description.strip():  # Only create if description is not empty
-                    db_item = ItemDB(
+                # CREATE new item (no id or id not found in active items)
+                if item_data.description.strip():
+                    new_item = ItemDB(
                         order_id=order_id,
                         description=item_data.description,
                         quantity=item_data.quantity,
@@ -408,20 +412,13 @@ def update_order(order_id: int, order_data: OrderUpdate, db: Session = Depends(g
                         per_item_discount=item_data.per_item_discount,
                         vat=item_data.vat
                     )
-                    db.add(db_item)
-                    order.items.append(db_item)  # Update in-memory relationship
+                    db.add(new_item)
         
-        # Delete items not in payload - remove from both in-memory and database
-        items_to_delete = []
-        for existing_item in order.items:
-            if existing_item.id not in payload_item_ids:
-                items_to_delete.append(existing_item)
-        
-        for item_to_delete in items_to_delete:
-            order.items.remove(item_to_delete)  # Remove from in-memory relationship first
-            # Soft-delete item
-            item_to_delete.deleted_at = datetime.utcnow()
-            item_to_delete.deleted_by = "system"
+        # 3) Soft-delete items missing from payload
+        for item_id, db_item in existing_items.items():
+            if item_id not in payload_ids:
+                db_item.deleted_at = datetime.utcnow()
+                db_item.deleted_by = "system"
 
     # Recalculate totals with final item set
     # order.items is now in sync with database state, so totals will be correct
