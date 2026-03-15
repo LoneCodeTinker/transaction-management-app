@@ -6,8 +6,8 @@ Run this before starting the application.
 """
 
 import sys
-from database import engine, Base
-from models import ClientDB, OrderDB, ItemDB, TransactionDB
+from .database import engine, Base
+from .models import ClientDB, OrderDB, ItemDB, TransactionDB
 
 
 def migrate():
@@ -19,9 +19,9 @@ def migrate():
         Base.metadata.create_all(bind=engine)
         print("✓ Database migration completed successfully.")
         print("✓ Created/Updated tables:")
-        print("  - clients")
-        print("  - orders")
-        print("  - items")
+        print("  - clients (with soft delete: deleted_at, deleted_by)")
+        print("  - orders (with soft delete: deleted_at, deleted_by)")
+        print("  - items (with soft delete: deleted_at, deleted_by)")
         print("  - transactions")
         return True
     except Exception as e:
