@@ -1,6 +1,6 @@
 """SQLAlchemy ORM models for the Orders Tracking app."""
 
-from sqlalchemy import Column, Integer, String, Float, Date, Boolean, DateTime, ForeignKey, and_
+from sqlalchemy import Column, Integer, String, Float, Date, Boolean, DateTime, ForeignKey, UniqueConstraint, and_
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import date as DateType, datetime
@@ -78,6 +78,13 @@ class OrderDB(SoftDeleteMixin, Base):
         cascade="all, delete-orphan",
         lazy="select"
     )
+    references = relationship(
+        "OrderReferenceDB",
+        primaryjoin=lambda: and_(OrderReferenceDB.order_id == OrderDB.id, OrderReferenceDB.deleted_at.is_(None)),
+        back_populates="order",
+        cascade="all, delete-orphan",
+        lazy="select"
+    )
 
 
 class ItemDB(SoftDeleteMixin, Base):
@@ -94,6 +101,22 @@ class ItemDB(SoftDeleteMixin, Base):
     vat = Column(Float, default=0)
 
     order = relationship("OrderDB", back_populates="items")
+
+
+class OrderReferenceDB(SoftDeleteMixin, Base):
+    """SQLAlchemy model for order references in the database."""
+    __tablename__ = "order_references"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    reference_type = Column(String, nullable=False)
+    reference_value = Column(String, nullable=False)
+    source_system = Column(String, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    __table_args__ = (UniqueConstraint('order_id', 'reference_type', 'reference_value', name='uq_order_references'),)
+
+    order = relationship("OrderDB", back_populates="references")
 
 
 class TransactionDB(Base):
@@ -185,6 +208,30 @@ class Item(BaseModel):
         from_attributes = True
 
 
+# OrderReference models
+class OrderReferenceCreate(BaseModel):
+    reference_type: str
+    reference_value: str
+    source_system: Optional[str] = None
+
+
+class OrderReference(BaseModel):
+    type: str  # Maps to reference_type in DB
+    value: str  # Maps to reference_value in DB
+    source_system: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+        
+    @classmethod
+    def from_orm(cls, obj):
+        return cls(
+            type=obj.reference_type,
+            value=obj.reference_value,
+            source_system=obj.source_system
+        )
+
+
 # Order models
 class OrderCreate(BaseModel):
     client_id: int
@@ -196,6 +243,7 @@ class OrderCreate(BaseModel):
     discount: float = 0
     status: Optional[str] = None
     items: list[ItemCreate] = []
+    references: Optional[list[OrderReferenceCreate]] = None
 
 
 class StructuredOrderCreate(BaseModel):
@@ -209,9 +257,11 @@ class StructuredOrderCreate(BaseModel):
     discount: float = 0
     status: Optional[str] = None
     items: list[ItemCreate] = []
+    references: Optional[list[OrderReferenceCreate]] = None
 
 
 class OrderUpdate(BaseModel):
+    client_name: Optional[str] = None
     project_name: Optional[str] = None
     file_path: Optional[str] = None
     date: Optional[DateType] = None
@@ -220,6 +270,10 @@ class OrderUpdate(BaseModel):
     discount: Optional[float] = None
     status: Optional[str] = None
     items: Optional[list[ItemCreate]] = None  # Optional items for smart update
+    references: Optional[list[OrderReferenceCreate]] = None
+
+    class Config:
+        extra = "forbid"
 
 
 class Order(BaseModel):
@@ -239,6 +293,7 @@ class Order(BaseModel):
     created_at: datetime
     updated_at: datetime
     items: list[Item] = []
+    references: list[OrderReference] = []
 
     class Config:
         from_attributes = True
