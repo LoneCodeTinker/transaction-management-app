@@ -12,6 +12,7 @@ from .models import (
     TransactionDB, TransactionCreate, TransactionUpdate, Transaction,
     ClientDB, ClientCreate, ClientUpdate, Client,
     OrderDB, OrderCreate, OrderUpdate, Order, StructuredOrderCreate,
+    OrderReferenceDB, OrderReference, OrderReferenceCreate,
     ItemDB, ItemCreate, ItemUpdate, Item
 )
 from .order_service import OrderService
@@ -168,6 +169,7 @@ def delete_client(client_id: int, db: Session = Depends(get_db)):
 def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
     """Create a new order with items and auto-calculate totals."""
     audit_log("Create Order", details=f"Client ID: {order_data.client_id}, Date: {order_data.date}")
+    print(f"Received order creation request at '/orders': {order_data}")
 
     try:
         order = OrderService.create_order(
@@ -182,6 +184,28 @@ def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
             status=order_data.status,
             items=[item.dict() for item in order_data.items]
         )
+        
+        # Handle references if provided
+        if order_data.references:
+            for ref in order_data.references:
+                # Check if reference already exists (not soft-deleted)
+                existing = db.query(OrderReferenceDB).filter(
+                    OrderReferenceDB.order_id == order.id,
+                    OrderReferenceDB.reference_type == ref.reference_type,
+                    OrderReferenceDB.reference_value == ref.reference_value,
+                    OrderReferenceDB.deleted_at.is_(None)
+                ).first()
+                
+                if not existing:
+                    new_reference = OrderReferenceDB(
+                        order_id=order.id,
+                        reference_type=ref.reference_type,
+                        reference_value=ref.reference_value,
+                        source_system=ref.source_system
+                    )
+                    db.add(new_reference)
+            db.commit()
+        
         return {"message": "Order created.", "id": order.id}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -223,7 +247,27 @@ def create_order_structured(order_data: StructuredOrderCreate, db: Session = Dep
             status=order_data.status,
             items=[item.dict() for item in order_data.items]
         )
-        return {"message": "Order created.", "id": order.id, "client_id": order.client_id}
+        
+        # Handle references if provided
+        if order_data.references:
+            for ref in order_data.references:
+                # Check if reference already exists (not soft-deleted)
+                existing = db.query(OrderReferenceDB).filter(
+                    OrderReferenceDB.order_id == order.id,
+                    OrderReferenceDB.reference_type == ref.reference_type,
+                    OrderReferenceDB.reference_value == ref.reference_value,
+                    OrderReferenceDB.deleted_at.is_(None)
+                ).first()
+                
+                if not existing:
+                    new_reference = OrderReferenceDB(
+                        order_id=order.id,
+                        reference_type=ref.reference_type,
+                        reference_value=ref.reference_value,
+                        source_system=ref.source_system
+                    )
+                    db.add(new_reference)
+            db.commit()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -362,18 +406,46 @@ def get_client_orders(client_id: int, db: Session = Depends(get_db)):
 
 @app.put("/orders/{order_id}")
 def update_order(order_id: int, order_data: OrderUpdate, db: Session = Depends(get_db)):
-    """Update a specific order with smart item management and recalculate totals."""
+    """Update a specific order with smart item management and recalculate totals.
+    including handling of references.
+    add the missing feature that's in create_order
+    - Accepts client_name for lookup or auto-creation
+    - Auto-creates client if name doesn't exist
+    """
     audit_log("Update Order", details=f"ID: {order_id}")
+
+    print(order_data.dict()) # debug line to check incoming data
+    print(f"Received order update request at '/orders/{order_id}': {order_data}") # debug line to confirm endpoint is hit and data is received
 
     order = db.query(OrderDB).filter(OrderDB.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found.")
+    
+    # Handle client_name update if provided
+    if hasattr(order_data, 'client_name') and order_data.client_name is not None:
+        # Compare with current order's client name
+        current_client_name = order.client.display_name if order.client else None
+        if current_client_name != order_data.client_name:
+            # Look up or create client by display_name
+            client = db.query(ClientDB).filter(ClientDB.display_name == order_data.client_name).first()
+            if not client:
+                # Client doesn't exist, create a new one
+                client = ClientDB(display_name=order_data.client_name)
+                db.add(client)
+                db.commit()
+                db.refresh(client)
+                audit_log("Create Client (Auto)", details=f"Name: {order_data.client_name} (auto-created for order update)")
+            order.client_id = client.id  # pyright: ignore
+            audit_log("Update Order", details=f"Client ID updated to: {client.id}")
 
     # Extract items before updating other fields
     items_payload = order_data.items if hasattr(order_data, 'items') and order_data.items is not None else None
     
-    # Update provided non-item fields
-    update_dict = order_data.dict(exclude_unset=True, exclude={'items'})
+    # Extract references before updating other fields
+    references_payload = order_data.references if hasattr(order_data, 'references') and order_data.references is not None else None
+    
+    # Update provided non-item, non-reference fields
+    update_dict = order_data.dict(exclude_unset=True, exclude={'items', 'references'})
     for key, value in update_dict.items():
         setattr(order, key, value)
 
@@ -419,6 +491,41 @@ def update_order(order_id: int, order_data: OrderUpdate, db: Session = Depends(g
             if item_id not in payload_ids:
                 db_item.deleted_at = datetime.utcnow()
                 db_item.deleted_by = "system"
+
+    # Smart reference management: only delete what's removed, only create what's new
+    if references_payload is not None:
+        # Get all active references
+        active_references = (
+            db.query(OrderReferenceDB)
+            .filter(
+                OrderReferenceDB.order_id == order_id,
+                OrderReferenceDB.deleted_at.is_(None)
+            )
+            .all()
+        )
+        
+        # Create set of payload reference keys (type, value)
+        payload_keys = {(ref.reference_type, ref.reference_value) for ref in references_payload}
+        active_keys = {(ref.reference_type, ref.reference_value) for ref in active_references}
+        
+        # Soft-delete references not in payload
+        for ref in active_references:
+            ref_key = (ref.reference_type, ref.reference_value)
+            if ref_key not in payload_keys:
+                ref.deleted_at = datetime.utcnow()
+                ref.deleted_by = "system"
+        
+        # Create references not in active set
+        for ref_data in references_payload:
+            ref_key = (ref_data.reference_type, ref_data.reference_value)
+            if ref_key not in active_keys:
+                new_reference = OrderReferenceDB(
+                    order_id=order_id,
+                    reference_type=ref_data.reference_type,
+                    reference_value=ref_data.reference_value,
+                    source_system=ref_data.source_system
+                )
+                db.add(new_reference)
 
     # Recalculate totals with final item set
     # order.items is now in sync with database state, so totals will be correct
