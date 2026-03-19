@@ -386,8 +386,8 @@ function App() {
   const salesVATTotal = +(salesTotalAfterDiscount * (salesVAT ? 0.15 : 0)).toFixed(2);
   const salesTotalWithVAT = +(salesTotalAfterDiscount + salesVATTotal).toFixed(2);
 
-  // Helper to create structured order payload for POST /orders/structured
-  function createStructuredOrderPayload() {
+  // Helper to create unified order payload for POST and PUT /orders
+  function buildOrderPayload() {
     const structuredItems = salesItems
       .filter(item => item.description.trim()) // Only include items with description
       .map(item => ({
@@ -397,13 +397,19 @@ function App() {
         vat: parseFloat(item.vat.toString()) || 0,
       }));
     
-    return {
+    const payload: any = {
       client_name: form.name,
-      project_name: '', // Optional, can be empty
       date: form.date,
       items: structuredItems,
       discount: salesDiscount,
     };
+    
+    const references = createReferencesArray(referenceFields);
+    if (references) {
+      payload.references = references;
+    }
+    
+    return payload;
   }
 
   // Helper to flatten sales items and references for backend
@@ -421,6 +427,17 @@ function App() {
       refs.qb.checked ? `QB#${refs.qb.value}` : null,
       refs.qbEst.checked ? `QB Est#${refs.qbEst.value}` : null
     ].filter(Boolean).join(', ');
+  }
+  
+  // Helper to convert referenceFields to structured references array
+  function createReferencesArray(refs: ReferenceFields) {
+    const refArray = [
+      refs.quotation.checked && refs.quotation.value ? { reference_type: 'quotation', reference_value: refs.quotation.value } : null,
+      refs.invoice.checked && refs.invoice.value ? { reference_type: 'invoice', reference_value: refs.invoice.value } : null,
+      refs.qb.checked && refs.qb.value ? { reference_type: 'qb', reference_value: refs.qb.value } : null,
+      refs.qbEst.checked && refs.qbEst.value ? { reference_type: 'qbEst', reference_value: refs.qbEst.value } : null
+    ].filter(Boolean) as Array<{ reference_type: string; reference_value: string }>;
+    return refArray.length > 0 ? refArray : undefined;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -449,21 +466,8 @@ function App() {
         // Update order/transaction
         try {
           if (activeTab === 'sales') {
-            // For orders: update order header with items in single payload
-            const orderUpdatePayload = {
-              date: form.date,
-              discount: salesDiscount,
-              items: salesItems
-                .filter(item => item.description.trim())
-                .map((item: any) => ({
-                  id: item.id ?? undefined, // Include ID if it exists (for update)
-                  description: item.description,
-                  quantity: parseInt(item.quantity.toString()) || 1,
-                  price: parseFloat(item.price.toString()) || 0,
-                  vat: parseFloat(item.vat.toString()) || 0,
-                }))
-                .filter(item => item.id !== undefined || item.description.trim()) // Keep all items for update
-            };
+            // For orders: use unified payload function
+            const orderUpdatePayload = buildOrderPayload();
             
             const orderRes = await fetch(`/orders/${editIdx}`, {
               method: 'PUT',
@@ -511,7 +515,7 @@ function App() {
         return;
       }
       try {
-        const structuredPayload = createStructuredOrderPayload();
+        const structuredPayload = buildOrderPayload();
         const res = await fetch('/orders/structured', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
