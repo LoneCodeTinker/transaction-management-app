@@ -5,6 +5,7 @@ from typing import List, Optional
 from datetime import date, datetime
 import logging
 from sqlalchemy.orm import Session
+from sqlalchemy import select, inspect
 
 from .database import engine, SessionLocal, Base, get_db, init_db
 from .backup_service import start_scheduler
@@ -506,19 +507,54 @@ def update_order(order_id: int, order_data: OrderUpdate, db: Session = Depends(g
         
         # Create set of payload reference keys (type, value)
         payload_keys = {(ref.reference_type, ref.reference_value) for ref in references_payload}
-        active_keys = {(ref.reference_type, ref.reference_value) for ref in active_references}
+        # active_keys = {(ref.reference_type, ref.reference_value) for ref in active_references}
         
-        # Soft-delete references not in payload
+        # Soft-delete active references not in payload
         for ref in active_references:
             ref_key = (ref.reference_type, ref.reference_value)
             if ref_key not in payload_keys:
                 ref.deleted_at = datetime.utcnow()
                 ref.deleted_by = "system"
         
-        # Create references not in active set
+        # db.flush()
+                    
+        # Process references in payload: restore deleted or insert new
         for ref_data in references_payload:
             ref_key = (ref_data.reference_type, ref_data.reference_value)
-            if ref_key not in active_keys:
+            
+            # Check if reference exists (including soft-deleted)
+            """ existing = db.query(OrderReferenceDB).filter(
+                OrderReferenceDB.order_id == order_id,
+                OrderReferenceDB.reference_type == ref_data.reference_type,
+                OrderReferenceDB.reference_value == ref_data.reference_value
+            ).first() """
+
+            stmt = select(OrderReferenceDB).where(
+                OrderReferenceDB.order_id == order_id,
+                OrderReferenceDB.reference_type == ref_data.reference_type,
+                OrderReferenceDB.reference_value == ref_data.reference_value
+            )
+
+            existing = db.execute(stmt).scalars().first()
+
+            print("Existing found:", existing)
+
+            if existing:
+                # Restore if deleted, skip if active
+                if existing.deleted_at is not None:
+                    existing.deleted_at = None
+                    existing.deleted_by = None
+                """ elif ref_key not in active_keys:
+                    # Only insert if not already in active set
+                    new_reference = OrderReferenceDB(
+                        order_id=order_id,
+                        reference_type=ref_data.reference_type,
+                        reference_value=ref_data.reference_value,
+                        source_system=ref_data.source_system
+                    )
+                    db.add(new_reference) """
+            
+            else:
                 new_reference = OrderReferenceDB(
                     order_id=order_id,
                     reference_type=ref_data.reference_type,
