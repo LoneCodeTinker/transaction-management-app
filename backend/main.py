@@ -309,6 +309,14 @@ def list_orders(db: Session = Depends(get_db)):
                 }
                 for item in order.items
             ],
+            "references": [
+                {
+                    "type": ref.reference_type,
+                    "value": ref.reference_value,
+                    "source_system": ref.source_system
+                }
+                for ref in order.references
+            ],
             "created_at": order.created_at.isoformat() if isinstance(order.created_at, datetime) else order.created_at,
             "updated_at": order.updated_at.isoformat() if isinstance(order.updated_at, datetime) else order.updated_at,
         }
@@ -351,6 +359,14 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
                 "vat": item.vat
             }
             for item in order.items
+        ],
+        "references": [
+            {
+                "type": ref.reference_type,
+                "value": ref.reference_value,
+                "source_system": ref.source_system
+            }
+            for ref in order.references
         ],
         "created_at": order.created_at.isoformat() if isinstance(order.created_at, datetime) else order.created_at,
         "updated_at": order.updated_at.isoformat() if isinstance(order.updated_at, datetime) else order.updated_at,
@@ -396,6 +412,14 @@ def get_client_orders(client_id: int, db: Session = Depends(get_db)):
                     "vat": item.vat
                 }
                 for item in order.items
+            ],
+            "references": [
+                {
+                    "type": ref.reference_type,
+                    "value": ref.reference_value,
+                    "source_system": ref.source_system
+                }
+                for ref in order.references
             ],
             "created_at": order.created_at.isoformat() if isinstance(order.created_at, datetime) else order.created_at,
             "updated_at": order.updated_at.isoformat() if isinstance(order.updated_at, datetime) else order.updated_at,
