@@ -439,8 +439,8 @@ def update_order(order_id: int, order_data: OrderUpdate, db: Session = Depends(g
     """
     audit_log("Update Order", details=f"ID: {order_id}")
 
-    print(order_data.dict()) # debug line to check incoming data
-    print(f"Received order update request at '/orders/{order_id}': {order_data}") # debug line to confirm endpoint is hit and data is received
+    # print(order_data.dict()) # debug line to check incoming data
+    # print(f"Received order update request at '/orders/{order_id}': {order_data}") # debug line to confirm endpoint is hit and data is received
 
     order = db.query(OrderDB).filter(OrderDB.id == order_id).first()
     if not order:
