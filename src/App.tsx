@@ -58,10 +58,14 @@ function App() {
   const [form, setForm] = useState<Record<string, string>>({
     name: '',
     date: today,
+    project_name: '',
+    placed_by: '',
+    mobile_number: '',
+    status: '',
   });
   // Sales tab specific state
   const [salesItems, setSalesItems] = useState([
-    { description: '', quantity: 1, price: '', total: 0, vat: 0 }
+    { description: '', quantity: 1, price: '', total: 0, vat: 0, per_item_discount: 0 }
   ]);
   const [salesDiscount, setSalesDiscount] = useState(0); // Discount for the whole sale
   const [salesVAT, setSalesVAT] = useState(true); // VAT checkbox
@@ -152,9 +156,10 @@ function App() {
             quantity: item.quantity || 1,
             price: item.price?.toString() || '',
             total: item.total || 0,
-            vat: item.vat || 0
+            vat: item.vat || 0,
+            per_item_discount: item.per_item_discount || 0
           }))
-        : [{ description: '', quantity: 1, price: '', total: 0, vat: 0 }];
+        : [{ description: '', quantity: 1, price: '', total: 0, vat: 0, per_item_discount: 0 }];
       setSalesItems(items);
       setSalesDiscount(tx.discount || 0);
       setSalesVAT(!!tx.vat_total);
@@ -352,7 +357,7 @@ function App() {
   };
   const handleAddSalesItem = () => {
     setSalesItems(items => {
-      const newItems = [...items, { description: '', quantity: 1, price: '', total: 0, vat: 0 }];
+      const newItems = [...items, { description: '', quantity: 1, price: '', total: 0, vat: 0, per_item_discount: 0 }];
       setTimeout(() => {
         const idx = newItems.length - 1;
         descriptionRefs.current[idx]?.focus();
@@ -497,8 +502,8 @@ function App() {
           }
           
           setEditIdx(null);
-          setForm({ name: '', date: today });
-          setSalesItems([{ description: '', quantity: 1, price: '', total: 0, vat: 0 }]);
+          setForm({ name: '', date: today, project_name: '', placed_by: '', mobile_number: '', status: '' });
+          setSalesItems([{ description: '', quantity: 1, price: '', total: 0, vat: 0, per_item_discount: 0 }]);
           setSalesDiscount(0);
           setSalesVAT(true);
           setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' }, qbEst: { checked: false, value: '' } });
@@ -523,8 +528,8 @@ function App() {
         });
         if (res.ok) {
           setMessage('Order saved!');
-          setForm({ name: '', date: today });
-          setSalesItems([{ description: '', quantity: 1, price: '', total: 0, vat: 0 }]);
+          setForm({ name: '', date: today, project_name: '', placed_by: '', mobile_number: '', status: '' });
+          setSalesItems([{ description: '', quantity: 1, price: '', total: 0, vat: 0, per_item_discount: 0 }]);
           setSalesDiscount(0);
           setSalesVAT(true);
           setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' }, qbEst: { checked: false, value: '' } });
@@ -874,8 +879,8 @@ function App() {
             {editIdx !== null && (
               <button type="button" style={{marginLeft:'0.5em'}} onClick={() => {
                 setEditIdx(null);
-                setForm({ name: '', date: today });
-                setSalesItems([{ description: '', quantity: 1, price: '', total: 0, vat: 0 }]);
+                setForm({ name: '', date: today, project_name: '', placed_by: '', mobile_number: '', status: '' });
+                setSalesItems([{ description: '', quantity: 1, price: '', total: 0, vat: 0, per_item_discount: 0 }]);
                 setSalesVAT(true);
                 setReferenceFields({ quotation: { checked: false, value: '' }, invoice: { checked: false, value: '' }, qb: { checked: false, value: '' }, qbEst: { checked: false, value: '' } });
                 setActions([]);
