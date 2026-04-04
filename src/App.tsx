@@ -69,6 +69,7 @@ function App() {
   ]);
   const [salesDiscount, setSalesDiscount] = useState(0); // Discount for the whole sale
   const [salesVAT, setSalesVAT] = useState(true); // VAT checkbox
+  const [showAdditionalDetails, setShowAdditionalDetails] = useState(false); // Collapsible section
   const [referenceFields, setReferenceFields] = useState<ReferenceFields>({
     quotation: { checked: false, value: '' },
     invoice: { checked: false, value: '' },
@@ -767,7 +768,7 @@ function App() {
                               ref={el => { descriptionRefs.current[idx] = el; }}
                             /></td>
                             <td style={{padding:'6px'}}><input type="number" min="1" value={item.quantity} onChange={e => handleSalesItemChange(idx, 'quantity', e.target.value)} style={{width:'100%', minWidth:60, padding:'6px'}} /></td>
-                            <td style={{padding:'6px'}}><input type="number" min="0" step="0.001" value={item.price} onChange={e => handleSalesItemChange(idx, 'price', e.target.value)} style={{width:'100%', minWidth:70, padding:'6px'}} /></td>
+                            <td style={{padding:'6px'}}><div><input type="number" min="0" step="0.001" value={item.price} onChange={e => handleSalesItemChange(idx, 'price', e.target.value)} style={{width:'100%', minWidth:70, padding:'6px'}} /></div><div style={{fontSize:'0.75em', color:'#666', marginTop:'4px'}}><label><input type="number" min="0" step="0.01" value={item.per_item_discount} onChange={e => handleSalesItemChange(idx, 'per_item_discount', e.target.value)} style={{width:50, padding:'3px'}} /> Discount</label></div></td>
                             <td style={{padding:'6px'}}>{Number(item.total).toFixed(2)}</td>
                             <td style={{padding:'6px'}}>{Number(item.vat).toFixed(2)}</td>
                             <td style={{padding:'6px'}}>{salesItems.length > 1 && <button type="button" onClick={() => handleRemoveSalesItem(idx)}>-</button>}</td>
@@ -801,6 +802,36 @@ function App() {
                     <input type="number" min="0" step="0.01" value={salesDiscount} onChange={e => setSalesDiscount(Number(e.target.value))} style={{width:100,marginLeft:8}} />
                   </div>
                   <strong>Total: </strong>{salesTotal.toFixed(2)} &nbsp; <strong>Discount: </strong>{salesDiscount.toFixed(2)} &nbsp; <strong>Total after Discount: </strong>{salesTotalAfterDiscount.toFixed(2)} &nbsp; <strong>VAT: </strong>{salesVATTotal.toFixed(2)} &nbsp; <strong>Total (with VAT): </strong>{salesTotalWithVAT.toFixed(2)}
+                </div>
+                <div style={{marginTop:16, border:'1px solid #ddd', borderRadius:'4px', padding:'12px'}}>
+                  <button type="button" onClick={() => setShowAdditionalDetails(!showAdditionalDetails)} style={{background:'none', border:'none', cursor:'pointer', fontSize:'1em', fontWeight:500, padding:0, color:'#0066cc'}}>
+                    {showAdditionalDetails ? '▼' : '▶'} Additional Details (Optional)
+                  </button>
+                  {showAdditionalDetails && (
+                    <div style={{marginTop:12, paddingTop:12, borderTop:'1px solid #ddd'}}>
+                      <div style={{marginBottom:10}}>
+                        <label>Project:</label>
+                        <input type="text" name="project_name" value={form.project_name || ''} onChange={handleFormChange} placeholder="Project (optional)" style={{width:'100%', marginTop:4}} />
+                      </div>
+                      <div style={{marginBottom:10}}>
+                        <label>Placed by:</label>
+                        <input type="text" name="placed_by" value={form.placed_by || ''} onChange={handleFormChange} placeholder="Placed by (optional)" style={{width:'100%', marginTop:4}} />
+                      </div>
+                      <div style={{marginBottom:10}}>
+                        <label>Mobile Number:</label>
+                        <input type="text" name="mobile_number" value={form.mobile_number || ''} onChange={handleFormChange} placeholder="Auto-filled if empty" style={{width:'100%', marginTop:4}} />
+                      </div>
+                      <div>
+                        <label>Status:</label>
+                        <select name="status" value={form.status || ''} onChange={handleFormChange} style={{width:'100%', marginTop:4}}>
+                          <option value="">-- Select Status --</option>
+                          <option value="Draft">Draft</option>
+                          <option value="Confirmed">Confirmed</option>
+                          <option value="Delivered">Delivered</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {/* Remove actions UI from add form for sales tab */}
               </>
