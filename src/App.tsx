@@ -401,6 +401,7 @@ function App() {
         quantity: parseInt(item.quantity.toString()) || 1,
         price: parseFloat(item.price.toString()) || 0,
         vat: parseFloat(item.vat.toString()) || 0,
+        per_item_discount: Number(item.per_item_discount) || 0,
       }));
     
     const payload: any = {
@@ -408,6 +409,10 @@ function App() {
       date: form.date,
       items: structuredItems,
       discount: salesDiscount,
+      project_name: form.project_name || undefined,
+      placed_by: form.placed_by || undefined,
+      mobile_number: form.mobile_number || undefined,
+      status: form.status || "Draft",
     };
     
     const references = createReferencesArray(referenceFields);
