@@ -741,6 +741,36 @@ function App() {
                   <label>Date:<span style={{color:'red'}}> *</span></label>
                   <input name="date" type="date" value={form.date} onChange={handleFormChange} required />
                 </div>
+                                <div style={{marginTop:16, border:'1px solid #ddd', borderRadius:'4px', padding:'12px'}}>
+                  <button type="button" onClick={() => setShowAdditionalDetails(!showAdditionalDetails)} style={{background:'none', border:'none', cursor:'pointer', fontSize:'1em', fontWeight:500, padding:0, color:'#0066cc'}}>
+                    {showAdditionalDetails ? '▼' : '▶'} Additional Details (Optional)
+                  </button>
+                  {showAdditionalDetails && (
+                    <div style={{marginTop:12, paddingTop:12, borderTop:'1px solid #ddd'}}>
+                      <div style={{marginBottom:10}}>
+                        <label>Project:</label>
+                        <input type="text" name="project_name" value={form.project_name || ''} onChange={handleFormChange} placeholder="Project (optional)" style={{width:'100%', marginTop:4}} />
+                      </div>
+                      <div style={{marginBottom:10}}>
+                        <label>Placed by:</label>
+                        <input type="text" name="placed_by" value={form.placed_by || ''} onChange={handleFormChange} placeholder="Placed by (optional)" style={{width:'100%', marginTop:4}} />
+                      </div>
+                      <div style={{marginBottom:10}}>
+                        <label>Mobile Number:</label>
+                        <input type="text" name="mobile_number" value={form.mobile_number || ''} onChange={handleFormChange} placeholder="Auto-filled if empty" style={{width:'100%', marginTop:4}} />
+                      </div>
+                      <div>
+                        <label>Status:</label>
+                        <select name="status" value={form.status || ''} onChange={handleFormChange} style={{width:'100%', marginTop:4}}>
+                          <option value="">-- Select Status --</option>
+                          <option value="Draft">Draft</option>
+                          <option value="Confirmed">Confirmed</option>
+                          <option value="Delivered">Delivered</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <div style={{marginTop:16}}>
                   <label>Items:</label>
                   <div style={{overflowX:'auto', maxWidth:'100%'}}>
@@ -808,7 +838,7 @@ function App() {
                   </div>
                   <strong>Total: </strong>{salesTotal.toFixed(2)} &nbsp; <strong>Discount: </strong>{salesDiscount.toFixed(2)} &nbsp; <strong>Total after Discount: </strong>{salesTotalAfterDiscount.toFixed(2)} &nbsp; <strong>VAT: </strong>{salesVATTotal.toFixed(2)} &nbsp; <strong>Total (with VAT): </strong>{salesTotalWithVAT.toFixed(2)}
                 </div>
-                <div style={{marginTop:16, border:'1px solid #ddd', borderRadius:'4px', padding:'12px'}}>
+{/*                 <div style={{marginTop:16, border:'1px solid #ddd', borderRadius:'4px', padding:'12px'}}>
                   <button type="button" onClick={() => setShowAdditionalDetails(!showAdditionalDetails)} style={{background:'none', border:'none', cursor:'pointer', fontSize:'1em', fontWeight:500, padding:0, color:'#0066cc'}}>
                     {showAdditionalDetails ? '▼' : '▶'} Additional Details (Optional)
                   </button>
@@ -837,7 +867,7 @@ function App() {
                       </div>
                     </div>
                   )}
-                </div>
+                </div> */}
                 {/* Remove actions UI from add form for sales tab */}
               </>
             ) : activeTab === 'received' ? (
