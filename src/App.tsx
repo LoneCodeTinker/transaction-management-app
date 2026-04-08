@@ -146,6 +146,10 @@ function App() {
       vat: tx.VAT?.toString() || '',
       total: tx.Total?.toString() || '',
       notes: activeTab === 'received' ? (tx.Description || '') : '',
+      project_name: tx.project_name || '',
+      placed_by: tx.placed_by || '',
+      mobile_number: tx.mobile_number || '',
+      status: tx.status || '',
     });
     setFormDone(!!tx.Done); // Set formDone from transaction
     if (activeTab === 'sales') {
