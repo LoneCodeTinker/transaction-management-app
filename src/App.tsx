@@ -768,8 +768,10 @@ function App() {
                         <select name="status" value={form.status || ''} onChange={handleFormChange} style={{width:'100%', marginTop:4}}>
                           <option value="">-- Select Status --</option>
                           <option value="Draft">Draft</option>
+                          <option value="Quotation">Quotation</option>
                           <option value="Confirmed">Confirmed</option>
                           <option value="Delivered">Delivered</option>
+                          <option value="Cancelled">Cancelled</option>
                         </select>
                       </div>
                     </div>
