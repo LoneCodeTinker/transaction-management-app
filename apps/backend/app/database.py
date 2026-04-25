@@ -4,10 +4,24 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.orm.exc import DetachedInstanceError
-import os
+from . import config
 
-# SQLite database file
-DATABASE_URL = "sqlite:///./orders_tracking.db"
+# Environment-aware path configuration
+BASE_DIR = config.BASE_DIR  # Path(__file__).resolve().parents[3]
+
+""" DATA_ROOT = Path(
+    os.getenv("DATA_ROOT", BASE_DIR / "data")
+) """
+DATA_ROOT = config.DATA_ROOT
+
+DB_PATH = config.DB_PATH  # DATA_ROOT / "db" / "orders_tracking.db"
+
+# SQLite database file with environment override support
+""" DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    f"sqlite:///{DB_PATH}"
+) """
+DATABASE_URL = config.DATABASE_URL
 
 engine = create_engine(
     DATABASE_URL, 

@@ -11,12 +11,23 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from apscheduler.schedulers.background import BackgroundScheduler
+from . import config
 
 logger = logging.getLogger(__name__)
 
+# Environment-aware path configuration
+""" BASE_DIR = Path(__file__).resolve().parents[3]
+DATA_ROOT = Path(
+    os.getenv("DATA_ROOT", BASE_DIR / "data")
+)
+
 # Backup configuration
-BACKUP_DIR = Path("backups")
-DB_FILE = Path("orders_tracking.db")
+BACKUP_DIR = DATA_ROOT / "backups"
+DATABASE_URL = DATA_ROOT / "db" / "orders_tracking.db" """
+
+DATA_ROOT = config.DATA_ROOT
+BACKUP_DIR = config.DATA_ROOT / "backups"
+DATABASE_URL = config.DB_PATH
 BACKUP_RETENTION = 10  # Keep only the latest 10 backups
 
 
@@ -43,8 +54,8 @@ def backup_database():
         create_backup_directory()
         
         # Check if database file exists
-        if not DB_FILE.exists():
-            logger.warning(f"Database file {DB_FILE} not found. Skipping backup.")
+        if not DATABASE_URL.exists():
+            logger.warning(f"Database file {DATABASE_URL} not found. Skipping backup.")
             return
         
         # Create backup with timestamp
@@ -52,7 +63,7 @@ def backup_database():
         backup_path = BACKUP_DIR / backup_filename
         
         # Copy database file
-        shutil.copy2(str(DB_FILE), str(backup_path))
+        shutil.copy2(str(DATABASE_URL), str(backup_path))
         logger.info(f"✓ Database backed up: {backup_path}")
         
         # Clean up old backups (keep only latest 10)

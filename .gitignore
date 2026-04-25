@@ -1,5 +1,4 @@
 # Logs
-logs
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -27,3 +26,23 @@ __pycache__/
 *.pyc
 *.db
 *.backup
+# Data (runtime)
+data/db/*
+data/logs/*
+data/backups/*
+
+# Keep folder structure
+!data/db/.gitkeep
+!data/logs/.gitkeep
+!data/backups/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+
+# Env
+.env
+
+# Node
+node_modules/
+dist/

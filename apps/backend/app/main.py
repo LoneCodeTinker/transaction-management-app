@@ -1,13 +1,16 @@
+from logging import config
+
 from fastapi import FastAPI, HTTPException, Body, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 from datetime import date, datetime
 import logging
+import os
 from sqlalchemy.orm import Session
 from sqlalchemy import select, inspect
 
-from .database import engine, SessionLocal, Base, get_db, init_db
+from .database import engine, SessionLocal, Base, get_db, init_db, DATA_ROOT
 from .backup_service import start_scheduler
 from .models import (
     TransactionDB, TransactionCreate, TransactionUpdate, Transaction,
@@ -17,6 +20,7 @@ from .models import (
     ItemDB, ItemCreate, ItemUpdate, Item
 )
 from .order_service import OrderService
+from . import config
 
 
 app = FastAPI(title="Orders Tracking API")
@@ -34,8 +38,13 @@ formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 # Remove all handlers first to avoid duplicates
 if logger.hasHandlers():
     logger.handlers.clear()
-# File handler
-file_handler = logging.FileHandler("app.log")
+# File handler with environment-aware path
+""" log_path = os.getenv(
+    "LOG_PATH",
+    str(DATA_ROOT / "logs" / "app.log")
+) """
+LOG_PATH = config.LOG_PATH  # str(config.DATA_ROOT / "logs" / "app.log")
+file_handler = logging.FileHandler(LOG_PATH)
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 # Stream handler (console)
