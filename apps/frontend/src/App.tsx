@@ -4,6 +4,7 @@ import editIcon from './assets/edit-icon.svg';
 import delIcon from './assets/del-icon3.svg';
 import LogoRct from './assets/Logo-rct.svg';
 import DoneCheckMark from './assets/DoneCheckMark.svg';
+import { buildUrl } from './api/config';
 
 const TABS = [
   { key: 'sales', label: 'Sales', entity: 'Customer' },
@@ -111,7 +112,8 @@ function App() {
         // For sales tab, fetch from new /orders endpoint
         // For other tabs, fetch from legacy /transactions endpoint
         const endpoint = activeTab === 'sales' ? '/orders' : `/transactions/${activeTab}`;
-        const res = await fetch(endpoint);
+        console.log("API CALL:", buildUrl(endpoint));
+        const res = await fetch(buildUrl(endpoint));
         if (res.ok) {
           const data = await res.json();
           setTransactions(data);
@@ -195,13 +197,15 @@ function App() {
     if (!window.confirm('Are you sure you want to delete this transaction?')) return;
     try {
       const endpoint = activeTab === 'sales' ? `/orders/${txId}` : `/transactions/${activeTab}/${txId}`;
-      const res = await fetch(endpoint, { method: 'DELETE' });
+      console.log("API CALL:", buildUrl(endpoint));
+      const res = await fetch(buildUrl(endpoint), { method: 'DELETE' });
       if (res.ok) {
         setMessage('Transaction deleted!');
         setEditIdx(null);
         // Refetch transactions/orders
         const fetchEndpoint = activeTab === 'sales' ? '/orders' : `/transactions/${activeTab}`;
-        const res2 = await fetch(fetchEndpoint);
+        console.log("API CALL:", buildUrl(fetchEndpoint));
+        const res2 = await fetch(buildUrl(fetchEndpoint));
         if (res2.ok) setTransactions(await res2.json());
       } else {
         setMessage('Error deleting transaction');
@@ -483,8 +487,8 @@ function App() {
           if (activeTab === 'sales') {
             // For orders: use unified payload function
             const orderUpdatePayload = buildOrderPayload();
-            
-            const orderRes = await fetch(`/orders/${editIdx}`, {
+            console.log("API CALL:", buildUrl(`/orders/${editIdx}`));
+            const orderRes = await fetch(buildUrl(`/orders/${editIdx}`), {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(orderUpdatePayload),
@@ -498,7 +502,8 @@ function App() {
             setMessage('Order updated!');
           } else {
             // For transactions, use old endpoint
-            const res = await fetch(`/transactions/${activeTab}/${editIdx}`, {
+            console.log("API CALL:", buildUrl(`/transactions/${activeTab}/${editIdx}`));
+            const res = await fetch(buildUrl(`/transactions/${activeTab}/${editIdx}`), {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload),
@@ -522,7 +527,8 @@ function App() {
           setFormDone(false);
           // Refetch transactions/orders
           const endpoint = activeTab === 'sales' ? '/orders' : `/transactions/${activeTab}`;
-          const res2 = await fetch(endpoint);
+          console.log("API CALL:", buildUrl(endpoint));
+          const res2 = await fetch(buildUrl(endpoint));
           if (res2.ok) setTransactions(await res2.json());
         } catch {
           setMessage('Network error');
@@ -531,7 +537,8 @@ function App() {
       }
       try {
         const structuredPayload = buildOrderPayload();
-        const res = await fetch('/orders/structured', {
+        console.log("API CALL:", buildUrl('/orders/structured'));
+        const res = await fetch(buildUrl('/orders/structured'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(structuredPayload),
@@ -547,7 +554,8 @@ function App() {
           setPaidStatus('none');
           setFormDone(false);
           // Refetch orders from new endpoint
-          const orderRes = await fetch('/orders');
+          console.log("API CALL:", buildUrl('/orders'));
+          const orderRes = await fetch(buildUrl('/orders'));
           if (orderRes.ok) setTransactions(await orderRes.json());
         } else {
           const data = await res.json();
@@ -578,7 +586,8 @@ function App() {
       if (editIdx !== null) {
         // Update transaction with full payload
         try {
-          const res = await fetch(`/transactions/${activeTab}/${editIdx}`, {
+          console.log("API CALL:", buildUrl(`/transactions/${activeTab}/${editIdx}`));
+          const res = await fetch(buildUrl(`/transactions/${activeTab}/${editIdx}`), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -591,7 +600,8 @@ function App() {
             setActions([]);
             setFormDone(false);
             // Refetch transactions
-            const res2 = await fetch(`/transactions/${activeTab}`);
+            console.log("API CALL:", buildUrl(`/transactions/${activeTab}`));
+            const res2 = await fetch(buildUrl(`/transactions/${activeTab}`));
             if (res2.ok) setTransactions(await res2.json());
           } else {
             const data = await res.json();
@@ -603,7 +613,8 @@ function App() {
         return;
       }
       try {
-        const res = await fetch('/transaction', {
+        console.log("API CALL:", buildUrl('/transaction'));
+        const res = await fetch(buildUrl('/transaction'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -650,7 +661,8 @@ function App() {
         done: false,
       };
       try {
-        const res = await fetch('/transaction', {
+        console.log("API CALL:", buildUrl('/transaction'));
+        const res = await fetch(buildUrl('/transaction'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -683,7 +695,8 @@ function App() {
       done: false,
     };
     try {
-      const res = await fetch('/transaction', {
+      console.log("API CALL:", buildUrl('/transaction'));
+      const res = await fetch(buildUrl('/transaction'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

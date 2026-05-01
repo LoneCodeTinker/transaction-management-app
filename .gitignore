@@ -26,6 +26,8 @@ __pycache__/
 *.pyc
 *.db
 *.backup
+test*
+
 # Data (runtime)
 data/db/*
 data/logs/*
