@@ -27,6 +27,7 @@ __pycache__/
 *.db
 *.backup
 test*
+infra/nginx/verify-config.cjs
 
 # Data (runtime)
 data/db/*
@@ -44,7 +45,10 @@ __pycache__/
 
 # Env
 .env
+!.env.development
+!.env.production
 
 # Node
 node_modules/
 dist/
+
