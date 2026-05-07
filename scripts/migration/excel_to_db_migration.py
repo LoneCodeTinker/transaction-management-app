@@ -21,18 +21,224 @@ Make sure DATABASE_URL points to your SQLite database.
 """
 
 import re
+import os
 import pandas as pd
+import tkinter as tk
 from datetime import datetime
 from sqlalchemy import create_engine, text
+from tkinter import filedialog
+from pathlib import Path
+
 
 # -----------------------------
 # Configuration
 # -----------------------------
 
-EXCEL_FILE = "orders.xlsx"
-DATABASE_URL = "sqlite:///./orders_tracking.db"
+def choose_file():
+    root = tk.Tk()
+    root.withdraw()  # hide the main window
+    file_path = filedialog.askopenfilename(
+        title="Select Excel file",
+        filetypes=[("Excel files", "*.xlsx *.xls")]
+    )
+    return file_path
+
+# EXCEL_FILE = choose_file()
+EXCEL_FILE = Path(
+    input("Drag & drop your Excel file here (or paste path)>_ ").strip().strip('"').strip("'")
+).expanduser()
+db_input = input("Drag & drop your DB file here (or paste path)>_ ").strip().strip('"').strip("'")
+
+db_path = Path(db_input).expanduser()
+
+# Force correct handling of absolute vs relative paths
+if not db_path.is_absolute():
+    db_path = (Path.cwd() / db_path).resolve()
+
+
+# -----------------------------
+# Debug Line
+# -----------------------------
+
+print("RAW INPUT:", db_input)
+print("FINAL PATH:", db_path)
+input("continue")
+
+# Now safely create parent directory
+db_path.parent.mkdir(parents=True, exist_ok=True)
+
+DATABASE_URL = f"sqlite:///{db_path}"
+
 
 engine = create_engine(DATABASE_URL)
+
+
+# -----------------------------
+# Database initialize
+# -----------------------------
+
+def validate_columns(df):
+    required_columns = [
+        "Name",
+        "Date",
+        "Description",
+        "Reference",
+        "Amount",
+        "VAT",
+        "Total",
+        "Done"
+    ]
+
+    missing = [col for col in required_columns if col not in df.columns]
+
+    if missing:
+        print("\n❌ Column validation failed")
+        print("Missing columns:", missing)
+        print("Available columns:", list(df.columns))
+        return False
+
+    print("✅ Excel columns validated")
+    return True
+
+
+# -----------------------------
+# Database initialize
+# -----------------------------
+
+def ensure_tables_exist(conn):
+
+    # Create tables first
+    conn.execute(text(""" CREATE TABLE IF NOT EXISTS clients (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        display_name TEXT,
+        english_name TEXT,
+        arabic_name TEXT,
+        contact_person TEXT,
+        mobile_number TEXT,
+        file_path TEXT,
+        created_at DATETIME,
+        updated_at DATETIME,
+        deleted_at DATETIME,
+        deleted_by TEXT
+    )"""))
+
+    conn.execute(text(""" CREATE TABLE IF NOT EXISTS orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        client_id INTEGER,
+        project_name TEXT,
+        file_path TEXT,
+        date DATETIME,
+        placed_by TEXT,
+        mobile_number TEXT,
+        order_total REAL,
+        discount REAL,
+        total_after_discount REAL,
+        vat_total REAL,
+        total_with_vat REAL,
+        status TEXT,
+        created_at DATETIME,
+        updated_at DATETIME,
+        deleted_at DATETIME,
+        deleted_by TEXT
+    )"""))
+
+    conn.execute(text(""" CREATE TABLE IF NOT EXISTS items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER,
+        description TEXT,
+        quantity INTEGER,
+        price REAL,
+        total REAL,
+        per_item_discount REAL,
+        vat REAL,
+        deleted_at DATETIME,
+        deleted_by TEXT
+    )"""))
+
+    conn.execute(text(""" CREATE TABLE IF NOT EXISTS order_references (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER,
+        type TEXT,
+        value TEXT,
+        created_at DATETIME,
+        updated_at DATETIME,
+        deleted_at DATETIME,
+        deleted_by TEXT
+    )"""))
+
+    # -----------------------------
+    # Ensure columns exist
+    # -----------------------------
+
+    ensure_columns_exist(conn, "clients", {
+        "display_name": "TEXT",
+        "english_name": "TEXT",
+        "arabic_name": "TEXT",
+        "contact_person": "TEXT",
+        "mobile_number": "TEXT",
+        "file_path": "TEXT",
+        "created_at": "DATETIME",
+        "updated_at": "DATETIME",
+        "deleted_at": "DATETIME",
+        "deleted_by": "TEXT"
+    })
+
+    ensure_columns_exist(conn, "orders", {
+        "client_id": "INTEGER",
+        "project_name": "TEXT",
+        "file_path": "TEXT",
+        "date": "DATETIME",
+        "placed_by": "TEXT",
+        "mobile_number": "TEXT",
+        "order_total": "REAL",
+        "discount": "REAL",
+        "total_after_discount": "REAL",
+        "vat_total": "REAL",
+        "total_with_vat": "REAL",
+        "status": "TEXT",
+        "created_at": "DATETIME",
+        "updated_at": "DATETIME",
+        "deleted_at": "DATETIME",
+        "deleted_by": "TEXT"
+    })
+
+    ensure_columns_exist(conn, "items", {
+        "order_id": "INTEGER",
+        "description": "TEXT",
+        "quantity": "INTEGER",
+        "price": "REAL",
+        "total": "REAL",
+        "per_item_discount": "REAL",
+        "vat": "REAL",
+        "deleted_at": "DATETIME",
+        "deleted_by": "TEXT"
+    })
+
+    ensure_columns_exist(conn, "order_references", {
+        "order_id": "INTEGER",
+        "type": "TEXT",
+        "value": "TEXT",
+        "created_at": "DATETIME",
+        "updated_at": "DATETIME",
+        "deleted_at": "DATETIME",
+        "deleted_by": "TEXT"
+    })
+
+
+# -----------------------------
+# Helper: Correct db schema
+# -----------------------------
+
+def ensure_columns_exist(conn, table_name, required_columns):
+    existing_cols = conn.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
+    existing_col_names = {col[1] for col in existing_cols}
+
+    for col_name, col_type in required_columns.items():
+        if col_name not in existing_col_names:
+            print(f"⚠️ Adding missing column '{col_name}' to '{table_name}'")
+            conn.execute(text(
+                f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}"
+            ))
 
 
 # -----------------------------
@@ -291,11 +497,28 @@ def run_migration():
 
     df = pd.read_excel(EXCEL_FILE)
 
+    df.columns = (
+        df.columns
+        .str.strip()
+        .str.replace("\xa0", " ", regex=False)
+    )
+
+    if not validate_columns(df):
+        print("❌ Migration aborted due to column mismatch")
+        return
+
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    df = df[df["Date"].notna()]
+    df["Date"] = df["Date"].dt.to_pydatetime()
+    df = df.sort_values(by="Date").reset_index(drop=True)
+
     with engine.begin() as conn:
+        ensure_tables_exist(conn)
+
 
         for index, row in df.iterrows():
 
-            client_name = row["Client Name"]
+            client_name = row["Name"]
             order_date = row["Date"]
 
             description = str(row["Description"])
