@@ -4,8 +4,48 @@ from sqlalchemy import Column, Integer, String, Float, Date, Boolean, DateTime, 
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import date as DateType, datetime
-from typing import Optional
-from pydantic import BaseModel
+from typing import Optional, Union
+from pydantic import BaseModel, field_validator
+
+
+def normalize_datetime_string(value: Union[str, DateType, datetime]) -> Union[str, DateType, datetime]:
+    """
+    Normalize various datetime/date string formats to standard ISO format.
+    
+    Handles:
+    - ISO with space separator (SQLite): '2025-06-24 00:00:00' → '2025-06-24'
+    - ISO with T separator: '2025-06-24T00:00:00' → '2025-06-24'
+    - Date only: '2025-06-24' → unchanged
+    - Already parsed objects: passed through unchanged
+    
+    For date fields, extracts only the date part (YYYY-MM-DD) regardless of time component.
+    This allows accepting datetime strings while properly parsing them as dates.
+    
+    Args:
+        value: String or date/datetime object
+        
+    Returns:
+        Normalized date string (YYYY-MM-DD) or original date/datetime object for Pydantic to parse
+    """
+    if not isinstance(value, str):
+        # Already a date/datetime object, let Pydantic handle it
+        return value
+    
+    value = value.strip()
+    
+    if not value:
+        return value
+    
+    # Extract date part only (first 10 characters in YYYY-MM-DD format)
+    # This handles both '2025-06-24' and '2025-06-24T14:30:00' or '2025-06-24 14:30:00'
+    if len(value) >= 10:
+        # Take first 10 chars if it matches date pattern (YYYY-MM-DD)
+        date_part = value[:10]
+        if len(date_part) == 10 and date_part[4] == '-' and date_part[7] == '-':
+            return date_part
+    
+    # Return unchanged if format is not recognized
+    return value
 
 
 class SoftDeleteMixin:
@@ -245,6 +285,12 @@ class OrderCreate(BaseModel):
     items: list[ItemCreate] = []
     references: Optional[list[OrderReferenceCreate]] = None
 
+    @field_validator('date', mode='before')
+    @classmethod
+    def validate_date(cls, v):
+        """Normalize and validate date field."""
+        return normalize_datetime_string(v)
+
 
 class StructuredOrderCreate(BaseModel):
     """Order creation with client name lookup instead of client_id."""
@@ -258,6 +304,12 @@ class StructuredOrderCreate(BaseModel):
     status: Optional[str] = None
     items: list[ItemCreate] = []
     references: Optional[list[OrderReferenceCreate]] = None
+
+    @field_validator('date', mode='before')
+    @classmethod
+    def validate_date(cls, v):
+        """Normalize and validate date field."""
+        return normalize_datetime_string(v)
 
 
 class OrderUpdate(BaseModel):
@@ -274,6 +326,14 @@ class OrderUpdate(BaseModel):
 
     class Config:
         extra = "forbid"
+
+    @field_validator('date', mode='before')
+    @classmethod
+    def validate_date(cls, v):
+        """Normalize and validate date field."""
+        if v is None:
+            return v
+        return normalize_datetime_string(v)
 
 
 class Order(BaseModel):
@@ -313,6 +373,12 @@ class TransactionCreate(BaseModel):
     actions: Optional[list[str]] = None
     done: bool = False
 
+    @field_validator('date', mode='before')
+    @classmethod
+    def validate_date(cls, v):
+        """Normalize and validate date field."""
+        return normalize_datetime_string(v)
+
 
 class TransactionUpdate(BaseModel):
     name: Optional[str] = None
@@ -326,6 +392,14 @@ class TransactionUpdate(BaseModel):
     notes: Optional[str] = None
     actions: Optional[list[str]] = None
     done: Optional[bool] = None
+
+    @field_validator('date', mode='before')
+    @classmethod
+    def validate_date(cls, v):
+        """Normalize and validate date field."""
+        if v is None:
+            return v
+        return normalize_datetime_string(v)
 
 
 class Transaction(BaseModel):
