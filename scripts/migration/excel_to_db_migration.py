@@ -158,8 +158,8 @@ def ensure_tables_exist(conn):
     conn.execute(text(""" CREATE TABLE IF NOT EXISTS order_references (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         order_id INTEGER,
-        type TEXT,
-        value TEXT,
+        reference_type TEXT,
+        reference_value TEXT,
         created_at DATETIME,
         updated_at DATETIME,
         deleted_at DATETIME,
@@ -216,8 +216,8 @@ def ensure_tables_exist(conn):
 
     ensure_columns_exist(conn, "order_references", {
         "order_id": "INTEGER",
-        "type": "TEXT",
-        "value": "TEXT",
+        "reference_type": "TEXT",
+        "reference_value": "TEXT",
         "created_at": "DATETIME",
         "updated_at": "DATETIME",
         "deleted_at": "DATETIME",
@@ -239,8 +239,8 @@ def ensure_columns_exist(conn, table_name, required_columns):
             conn.execute(text(
                 f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}"
             ))
-
-
+            
+            
 # -----------------------------
 # Helper: Client
 # -----------------------------
@@ -467,14 +467,14 @@ def insert_reference(conn, order_id, order_references, order_date):
     query = text("""
         INSERT INTO order_references (
             order_id,
-            type,
-            value,
+            reference_type,
+            reference_value,
             created_at,
             updated_at
         ) VALUES (
             :order_id,
-            :type,
-            :value,
+            :reference_type,
+            :reference_value,
             :created_at,
             :updated_at
         )
@@ -482,8 +482,8 @@ def insert_reference(conn, order_id, order_references, order_date):
 
     conn.execute(query, {
         "order_id": order_id,
-        "type": order_references["type"],
-        "value": order_references["value"],
+        "reference_type": order_references["type"],
+        "reference_value": order_references["value"],
         "created_at": order_date,
         "updated_at": order_date
     })
@@ -496,7 +496,7 @@ def insert_reference(conn, order_id, order_references, order_date):
 def run_migration():
 
     df = pd.read_excel(EXCEL_FILE)
-
+    
     df.columns = (
         df.columns
         .str.strip()
@@ -506,7 +506,7 @@ def run_migration():
     if not validate_columns(df):
         print("❌ Migration aborted due to column mismatch")
         return
-
+    
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
     df = df[df["Date"].notna()]
     df["Date"] = df["Date"].dt.to_pydatetime()
@@ -514,7 +514,7 @@ def run_migration():
 
     with engine.begin() as conn:
         ensure_tables_exist(conn)
-
+        
 
         for index, row in df.iterrows():
 
