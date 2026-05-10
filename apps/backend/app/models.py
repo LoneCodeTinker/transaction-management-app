@@ -98,7 +98,7 @@ class OrderDB(SoftDeleteMixin, Base):
     client_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), index=True)
     project_name = Column(String, nullable=True)
     file_path = Column(String, nullable=True)
-    date = Column(DateTime)
+    date = Column(Date)
     placed_by = Column(String, nullable=True)
     mobile_number = Column(String, nullable=True)
     order_total = Column(Float, default=0)
@@ -166,7 +166,7 @@ class TransactionDB(Base):
     id = Column(Integer, primary_key=True, index=True)
     type = Column(String, index=True)  # sales, purchases, expenses, received
     name = Column(String, index=True)  # vendor or customer
-    date = Column(DateTime)
+    date = Column(Date)
     description = Column(String, nullable=True)
     reference = Column(String, nullable=True)
     amount = Column(Float)
