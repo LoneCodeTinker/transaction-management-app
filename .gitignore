@@ -52,3 +52,4 @@ __pycache__/
 node_modules/
 dist/
 
+Corrupt Files/transactions.xlsx

@@ -98,7 +98,7 @@ class OrderDB(SoftDeleteMixin, Base):
     client_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), index=True)
     project_name = Column(String, nullable=True)
     file_path = Column(String, nullable=True)
-    date = Column(Date)
+    date = Column(DateTime)
     placed_by = Column(String, nullable=True)
     mobile_number = Column(String, nullable=True)
     order_total = Column(Float, default=0)
@@ -166,7 +166,7 @@ class TransactionDB(Base):
     id = Column(Integer, primary_key=True, index=True)
     type = Column(String, index=True)  # sales, purchases, expenses, received
     name = Column(String, index=True)  # vendor or customer
-    date = Column(Date)
+    date = Column(DateTime)
     description = Column(String, nullable=True)
     reference = Column(String, nullable=True)
     amount = Column(Float)
@@ -214,6 +214,14 @@ class Client(BaseModel):
 
     class Config:
         from_attributes = True
+
+    @field_validator('created_at', 'updated_at', mode='before')
+    @classmethod
+    def validate_datetime(cls, v):
+        """Normalize and validate datetime fields."""
+        if v is None:
+            return v
+        return normalize_datetime_string(v)
 
 
 # Item models
@@ -358,6 +366,22 @@ class Order(BaseModel):
     class Config:
         from_attributes = True
 
+    @field_validator('date', mode='before')
+    @classmethod
+    def validate_date(cls, v):
+        """Normalize and validate date field."""
+        if v is None:
+            return v
+        return normalize_datetime_string(v)
+
+    @field_validator('created_at', 'updated_at', mode='before')
+    @classmethod
+    def validate_datetime(cls, v):
+        """Normalize and validate datetime fields."""
+        if v is None:
+            return v
+        return normalize_datetime_string(v)
+
 
 class TransactionCreate(BaseModel):
     type: str
@@ -421,3 +445,19 @@ class Transaction(BaseModel):
 
     class Config:
         from_attributes = True
+
+    @field_validator('date', mode='before')
+    @classmethod
+    def validate_date(cls, v):
+        """Normalize and validate date field."""
+        if v is None:
+            return v
+        return normalize_datetime_string(v)
+
+    @field_validator('created_at', 'updated_at', mode='before')
+    @classmethod
+    def validate_datetime(cls, v):
+        """Normalize and validate datetime fields."""
+        if v is None:
+            return v
+        return normalize_datetime_string(v)

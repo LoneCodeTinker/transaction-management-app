@@ -34,6 +34,22 @@ from pathlib import Path
 # Configuration
 # -----------------------------
 
+def normalize_date_string(date_val):
+    """Normalize date string formats for pandas to_datetime parsing."""
+    if pd.isna(date_val):
+        return date_val
+    
+    date_str = str(date_val).strip()
+    
+    # Convert SQLite/Excel space separator to ISO T separator for pandas compatibility
+    if ' ' in date_str and len(date_str) > 10:
+        parts = date_str.split(' ', 1)
+        if len(parts) == 2 and '-' in parts[0] and ':' in parts[1]:
+            return f"{parts[0]}T{parts[1]}"
+    
+    return date_str
+
+
 def choose_file():
     root = tk.Tk()
     root.withdraw()  # hide the main window
@@ -506,6 +522,9 @@ def run_migration():
     if not validate_columns(df):
         print("❌ Migration aborted due to column mismatch")
         return
+    
+    # Normalize date formats before parsing (handles SQLite space separator: '2025-06-24 00:00:00')
+    df["Date"] = df["Date"].apply(normalize_date_string)
     
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
     df = df[df["Date"].notna()]
