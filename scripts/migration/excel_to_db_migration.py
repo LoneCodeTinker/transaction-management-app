@@ -143,7 +143,7 @@ def ensure_tables_exist(conn):
         client_id INTEGER,
         project_name TEXT,
         file_path TEXT,
-        date DATETIME,
+        date DATE,
         placed_by TEXT,
         mobile_number TEXT,
         order_total REAL,
@@ -204,7 +204,7 @@ def ensure_tables_exist(conn):
         "client_id": "INTEGER",
         "project_name": "TEXT",
         "file_path": "TEXT",
-        "date": "DATETIME",
+        "date": "DATE",
         "placed_by": "TEXT",
         "mobile_number": "TEXT",
         "order_total": "REAL",
@@ -380,7 +380,7 @@ def parse_reference(ref):
 # Insert Order
 # -----------------------------
 
-def insert_order(conn, client_id, row, discount):
+def insert_order_old(conn, client_id, row, discount):
 
     order_total = float(row["Amount"]) if not pd.isna(row["Amount"]) else 0
     vat_total = float(row["VAT"]) if not pd.isna(row["VAT"]) else 0
@@ -437,7 +437,67 @@ def insert_order(conn, client_id, row, discount):
     })
 
     return res.lastrowid
+def insert_order(conn, client_id, row, discount):
 
+    order_total = float(row["Amount"]) if not pd.isna(row["Amount"]) else 0
+    vat_total = float(row["VAT"]) if not pd.isna(row["VAT"]) else 0
+    total_with_vat = float(row["Total"]) if not pd.isna(row["Total"]) else 0
+
+    total_after_discount = order_total - discount
+
+    status = "completed" if str(row["Done"]).upper() == "TRUE" else "pending"
+
+    order_date = row["Date"]
+
+    # ✅ FIX: normalize formats
+    date_only = order_date.strftime("%Y-%m-%d") if order_date else None
+    datetime_iso = order_date.isoformat() if order_date else None
+
+    query = text("""
+        INSERT INTO orders (
+            client_id,
+            project_name,
+            file_path,
+            date,
+            placed_by,
+            mobile_number,
+            order_total,
+            discount,
+            total_after_discount,
+            vat_total,
+            total_with_vat,
+            status,
+            created_at
+        ) VALUES (
+            :client_id,
+            NULL,
+            NULL,
+            :date,
+            NULL,
+            NULL,
+            :order_total,
+            :discount,
+            :total_after_discount,
+            :vat_total,
+            :total_with_vat,
+            :status,
+            :created_at
+        )
+    """)
+
+    res = conn.execute(query, {
+        "client_id": client_id,
+        "date": date_only,          # ✅ DATE column
+        "order_total": order_total,
+        "discount": discount,
+        "total_after_discount": total_after_discount,
+        "vat_total": vat_total,
+        "total_with_vat": total_with_vat,
+        "status": status,
+        "created_at": datetime_iso  # ✅ DATETIME column
+    })
+
+    return res.lastrowid
 
 # -----------------------------
 # Insert Item
@@ -530,7 +590,7 @@ def run_migration():
     
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
     df = df[df["Date"].notna()]
-    df["Date"] = df["Date"].dt.to_pydatetime()
+    df["Date"] = df["Date"].dt.date
     df = df.sort_values(by="Date").reset_index(drop=True)
 
     with engine.begin() as conn:
